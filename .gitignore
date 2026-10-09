@@ -1,0 +1,11 @@
+build/
+models/
+dumps/
+.venv/
+__pycache__/
+*.nsys-rep
+*.ncu-rep
+*.sqlite
+compile_flags.txt
+CLAUDE.md
+.claude/

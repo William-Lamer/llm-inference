@@ -1,0 +1,11 @@
+[project]
+name = "llm-inference"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "huggingface-hub>=1.33.0",
+    "numpy>=2.5.3",
+    "safetensors>=0.8.0",
+    "torch>=2.14.1",
+    "transformers>=5",
+]
