@@ -1,0 +1,6 @@
+The capital of France is
+Once upon a time, in a small village by the sea, there lived an old fisherman who
+def fibonacci(n):
+The three laws of thermodynamics state that
+Montreal is the largest city in the province of
+In computer science, a cache is a hardware or software component that stores data so that future requests for that data can be served faster. A cache hit occurs when
