@@ -3,7 +3,7 @@
 #include <time.h>
 
 #include "dump.cuh"
-#include "model.cuh"
+#include "forward.cuh"
 
 static double now_seconds(void) {
     struct timespec ts;
@@ -97,10 +97,13 @@ int main(int argc, char **argv) {
     if (tokens_path != NULL) {
         int n_tokens;
         int *tokens = read_tokens(tokens_path, &n_tokens);
+        RunState s;
+        alloc_run_state(&s, &cfg);
         for (int pos = 0; pos < n_tokens; pos++) {
-            // TODO(M2): forward pass for tokens[pos] at position pos
+            forward(&cfg, &w, &s, tokens[pos]);
         }
         printf("ran %d positions\n", n_tokens);
+        free_run_state(&s);
         free(tokens);
     }
 
