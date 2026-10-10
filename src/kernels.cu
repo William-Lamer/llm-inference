@@ -1,4 +1,5 @@
 #include <math.h>
+#include <limits.h>
 
 #include "common.cuh"
 #include "kernels.cuh"
@@ -255,3 +256,51 @@ void swiglu_forward(bf16 *gate, const bf16 *up, int n) {
     swiglu_kernel<<<n_blocks, block_size>>>(gate, up, n);
     CUDA_CHECK_LAUNCH();
 }
+
+// keeps the larger value, but on a tie keeps the lowest index.
+static __device__ void argmax_pair(float *val, int *idx, float second_val, int second_idx){
+    if (second_val > *val || (second_val == *val && second_idx < *idx)) {
+        *val = second_val;
+        *idx = second_idx;
+    }
+}
+
+// its not worth to do multiple passes since its so small
+static __global__ void argmax_kernel(int *out, const bf16 *x, int n) {
+    float best_val = -INFINITY;
+    int best_idx = INT_MAX;
+    for (int i = threadIdx.x; i < n; i += blockDim.x) {
+        argmax_pair(&best_val, &best_idx, __bfloat162float(x[i]), i);
+    }
+
+    for (int off = 16; off > 0; off >>= 1) {
+        float other_val = __shfl_xor_sync(0xffffffff, best_val, off);
+        int other_idx = __shfl_xor_sync(0xffffffff, best_idx, off);
+        argmax_pair(&best_val, &best_idx, other_val, other_idx);
+    }
+
+    __shared__ float warp_vals[32];
+    __shared__ int warp_idxs[32];
+    int warp = threadIdx.x / 32;
+    int lane = threadIdx.x % 32;
+    if (lane == 0) {
+        warp_vals[warp] = best_val;
+        warp_idxs[warp] = best_idx;
+    }
+    __syncthreads();
+
+    if (threadIdx.x == 0) {
+        int n_warps = blockDim.x / 32;
+        for (int w = 0; w < n_warps; w++) {
+            argmax_pair(&best_val, &best_idx, warp_vals[w], warp_idxs[w]);
+        }
+        *out = best_idx;
+    }
+}
+
+void argmax_forward(int *out, const bf16 *x, int n) {
+    int block_size = 1024;
+    argmax_kernel<<<1, block_size>>>(out, x, n);
+    CUDA_CHECK_LAUNCH();
+}
+

@@ -11,3 +11,4 @@ void attention_forward(bf16 *out, const bf16 *q, const bf16 *key_cache, const bf
                        float scale);
 void residual_add_forward(bf16 *x, const bf16 *y, int n);
 void swiglu_forward(bf16 *gate, const bf16 *up, int n);
+void argmax_forward(int *out, const bf16 *x, int n);
