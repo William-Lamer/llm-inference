@@ -62,3 +62,24 @@ void rmsnorm_forward(bf16 *out, const bf16 *in, const bf16 *weight, int rows, in
     rmsnorm_kernel<<<rows, block_size>>>(out, in, weight, dim, eps);
     CUDA_CHECK_LAUNCH();
 }
+
+static __global__ void gemv_kernel(bf16 *out, const bf16 *w, const bf16 *x, int rows, int cols) {
+    int r = blockIdx.x * blockDim.x + threadIdx.x;
+    if (r < rows) {
+        const bf16 *w_row = w + (size_t)r * cols;
+        float sum = 0.0f;
+        for (int c = 0; c < cols; c++) {
+            float a = __bfloat162float(w_row[c]);
+            float b = __bfloat162float(x[c]);
+            sum += a * b;
+        }
+        out[r] = __float2bfloat16(sum);
+    }
+}
+
+void gemv_forward(bf16 *out, const bf16 *w, const bf16 *x, int rows, int cols) {
+    int block_size = 256;
+    int n_blocks = (rows + block_size - 1) / block_size;
+    gemv_kernel<<<n_blocks, block_size>>>(out, w, x, rows, cols);
+    CUDA_CHECK_LAUNCH();
+}
