@@ -14,6 +14,9 @@ typedef struct {
     bf16 *key_cache;   // [n_layers, max_seq, n_kv_heads * head_dim]
     bf16 *value_cache; // [n_layers, max_seq, n_kv_heads * head_dim]
     int max_seq;       // positions the KV cache holds
+    bf16 *hb;          // [intermediate] gate, then silu(gate) * up
+    bf16 *hb2;         // [intermediate] up
+    bf16 *logits;      // [vocab]
 } RunState;
 
 void alloc_run_state(RunState *s, const Config *cfg);

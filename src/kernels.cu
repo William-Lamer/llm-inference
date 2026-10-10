@@ -223,6 +223,35 @@ void attention_forward(bf16 *out, const bf16 *q, const bf16 *key_cache, const bf
 }
 
 
+static __global__ void residual_add_kernel(bf16 *x, const bf16 *y, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float sum = __bfloat162float(x[i]) + __bfloat162float(y[i]);
+        x[i] = __float2bfloat16(sum);
+    }
+}
+
+void residual_add_forward(bf16 *x, const bf16 *y, int n) {
+    int block_size = 256;
+    int n_blocks = (n + block_size - 1) / block_size;
+    residual_add_kernel<<<n_blocks, block_size>>>(x, y, n);
+    CUDA_CHECK_LAUNCH();
+}
 
 
+static __global__ void swiglu_kernel(bf16 *gate, const bf16 *up, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        float g = __bfloat162float(gate[i]);
+        float u = __bfloat162float(up[i]);
+        float silu = round_bf16(g / (1.0f + expf(-g)));
+        gate[i] = __float2bfloat16(silu * u);
+    }
+}
 
+void swiglu_forward(bf16 *gate, const bf16 *up, int n) {
+    int block_size = 256;
+    int n_blocks = (n + block_size - 1) / block_size;
+    swiglu_kernel<<<n_blocks, block_size>>>(gate, up, n);
+    CUDA_CHECK_LAUNCH();
+}
