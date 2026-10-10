@@ -6,6 +6,7 @@ BUILD = build
 MODEL = models/Qwen3-0.6B
 REF = dumps/$(notdir $(MODEL))
 OUT = $(BUILD)/dumps/$(notdir $(MODEL))
+GREEDY = $(BUILD)/greedy/$(notdir $(MODEL))
 
 SRCS = $(wildcard src/*.cu)
 OBJS = $(patsubst src/%.cu,$(BUILD)/%.o,$(SRCS)) $(BUILD)/cJSON.o
@@ -34,12 +35,23 @@ check-weights: $(BUILD)/engine
 clean:
 	rm -rf $(BUILD)
 
-# Old engine dumps are removed first so a tensor the engine stopped writing can't pass.
+# Greedy runs each prompt twice through the 2 modes.
 check: $(BUILD)/engine
-	rm -rf $(OUT)
-	mkdir -p $(OUT)
-	for p in $(REF)/p*; do ./$(BUILD)/engine $(MODEL) --tokens $$p/tokens.txt --dump $(OUT)/$$(basename $$p) > /dev/null || exit 1; done
+	rm -rf $(OUT) $(GREEDY)
+	mkdir -p $(OUT) $(GREEDY)
+	for p in $(REF)/p*; do \
+	    d=$(OUT)/$$(basename $$p); \
+	    ./$(BUILD)/engine $(MODEL) --tokens $$p/tokens.txt --dump $$d > /dev/null 2> $$d.log || { cat $$d.log; exit 1; }; \
+	done
 	uv run ref/compare.py $(REF) $(OUT)
+	for p in $(REF)/p*; do \
+	    d=$(GREEDY)/$$(basename $$p); \
+	    mkdir -p $$d; \
+	    ./$(BUILD)/engine $(MODEL) --tokens $$p/tokens.txt --max-new $$(wc -w < $$p/greedy.txt) > $$d/generated.txt 2> $$d/engine.log || { cat $$d/engine.log; exit 1; }; \
+	    cat $$p/tokens.txt $$p/greedy.txt > $$d/forced_tokens.txt; \
+	    ./$(BUILD)/engine $(MODEL) --tokens $$d/forced_tokens.txt --dump $$d > /dev/null 2>> $$d/engine.log || { cat $$d/engine.log; exit 1; }; \
+	done
+	uv run ref/greedy.py $(REF) $(GREEDY)
 
 calibrate:
 	uv run ref/calibrate.py --model $(MODEL)
