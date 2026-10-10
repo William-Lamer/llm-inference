@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "common.cuh"
 #include "kernels.cuh"
 
@@ -125,3 +127,102 @@ void rope_forward(bf16 *x, int n_heads, int head_dim, int pos, float theta) {
     rope_kernel<<<n_blocks, block_size>>>(x, n_heads, head_dim, pos, theta);
     CUDA_CHECK_LAUNCH();
 }
+
+
+// the total over the whole block, returned to every thread.
+static __device__ float block_sum(float v) {
+    __shared__ float partials[32];
+    __syncthreads();
+    for (int off = 16; off > 0; off >>= 1) v += __shfl_xor_sync(0xffffffff, v, off);
+    int warp = threadIdx.x / 32;
+    int lane = threadIdx.x % 32;
+    if (lane == 0) {
+        partials[warp] = v;
+    }
+    __syncthreads();
+    float total = 0.0f;
+    int n_warps = blockDim.x / 32;
+    for (int w = 0; w < n_warps; w++) total += partials[w];
+    return total;
+}
+
+static __device__ float block_max(float v) {
+    __shared__ float partials[32];
+    __syncthreads();
+    for (int off = 16; off > 0; off >>= 1) v = fmaxf(v, __shfl_xor_sync(0xffffffff, v, off));
+    int warp = threadIdx.x / 32;
+    int lane = threadIdx.x % 32;
+    if (lane == 0) {
+        partials[warp] = v;
+    }
+    __syncthreads();
+    float result = -INFINITY;
+    int n_warps = blockDim.x / 32;
+    for (int w = 0; w < n_warps; w++) result = fmaxf(result, partials[w]);
+    return result;
+}
+
+
+// One block per query head
+static __global__ void attention_kernel(bf16 *out, const bf16 *q, const bf16 *key_cache,
+                                        const bf16 *value_cache, float *att, int n_heads,
+                                        int n_kv_heads, int head_dim, int pos, int max_seq,
+                                        float scale) {
+    int h = blockIdx.x;
+    int n_rep = n_heads / n_kv_heads;
+    int kv_head = h / n_rep;
+    int kv_dim = n_kv_heads * head_dim;
+
+    const bf16 *q_head = q + h * head_dim;
+    float *scores = att + (size_t)h * max_seq;
+
+    // step 1: one thread per cache position
+    for (int t = threadIdx.x; t <= pos; t += blockDim.x) {
+        const bf16 *k = key_cache + (size_t)t * kv_dim + kv_head * head_dim;
+        float dot = 0.0f;
+        for (int d = 0; d < head_dim; d++) {
+            dot += __bfloat162float(q_head[d]) * __bfloat162float(k[d]);
+        }
+        scores[t] = round_bf16(round_bf16(dot) * scale);
+    }
+    __syncthreads();
+
+    // step 2: softmax from 0 to pos
+    float local_max = -INFINITY;
+    for (int t = threadIdx.x; t <= pos; t += blockDim.x) local_max = fmaxf(local_max, scores[t]);
+    float max_score = block_max(local_max);
+
+    float local_sum = 0.0f;
+    for (int t = threadIdx.x; t <= pos; t += blockDim.x) local_sum += expf(scores[t] - max_score);
+    float sum_exp = block_sum(local_sum);
+
+    for (int t = threadIdx.x; t <= pos; t += blockDim.x) {
+        scores[t] = round_bf16(expf(scores[t] - max_score) / sum_exp);
+    }
+    __syncthreads();
+
+    // step 3: one thread per output dimension, weighted sum of the cached values.
+    for (int d = threadIdx.x; d < head_dim; d += blockDim.x) {
+        float acc = 0.0f;
+        for (int t = 0; t <= pos; t++) {
+            const bf16 *v = value_cache + (size_t)t * kv_dim + kv_head * head_dim;
+            acc += scores[t] * __bfloat162float(v[d]);
+        }
+        out[h * head_dim + d] = __float2bfloat16(acc);
+    }
+}
+
+void attention_forward(bf16 *out, const bf16 *q, const bf16 *key_cache, const bf16 *value_cache,
+                       float *att, int n_heads, int n_kv_heads, int head_dim, int pos, int max_seq,
+                       float scale) {
+
+    int block_size = 128;
+    attention_kernel<<<n_heads, block_size>>>(out, q, key_cache, value_cache, att, n_heads,
+                                              n_kv_heads, head_dim, pos, max_seq, scale);
+    CUDA_CHECK_LAUNCH();
+}
+
+
+
+
+
