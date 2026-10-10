@@ -5,6 +5,7 @@
 #include "common.cuh"
 
 #define MAX_SHARDS 8
+#define MAX_EOS 8
 
 typedef struct {
     int hidden_size;
@@ -18,6 +19,8 @@ typedef struct {
     float rms_norm_eps;
     float rope_theta;
     int tie_word_embeddings;
+    int eos_ids[MAX_EOS]; // from generation_config.json
+    int n_eos;
 } Config;
 
 // Matrices are PyTorch linear weights: [out, in] and row-major.

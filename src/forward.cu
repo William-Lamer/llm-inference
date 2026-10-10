@@ -33,6 +33,8 @@ void alloc_run_state(RunState *s, const Config *cfg) {
     CUDA_CHECK(cudaMalloc(&s->hb, cfg->intermediate_size * sizeof(bf16)));
     CUDA_CHECK(cudaMalloc(&s->hb2, cfg->intermediate_size * sizeof(bf16)));
     CUDA_CHECK(cudaMalloc(&s->logits, cfg->vocab_size * sizeof(bf16)));
+
+    CUDA_CHECK(cudaMalloc(&s->next_token, sizeof(int)));
 }
 
 void free_run_state(RunState *s) {
@@ -48,6 +50,7 @@ void free_run_state(RunState *s) {
     CUDA_CHECK(cudaFree(s->hb));
     CUDA_CHECK(cudaFree(s->hb2));
     CUDA_CHECK(cudaFree(s->logits));
+    CUDA_CHECK(cudaFree(s->next_token));
 }
 
 static void dump_layer(int l, const char *name, const bf16 *d_data, int n) {
@@ -145,4 +148,11 @@ void forward(const Config *cfg, const Weights *w, RunState *s, int token, int po
 
     gemv_forward(s->logits, w->lm_head, s->xb, cfg->vocab_size, cfg->hidden_size);
     dump_bf16("logits", s->logits, cfg->vocab_size);
+}
+
+int sample_argmax(const Config *cfg, RunState *s) {
+    argmax_forward(s->next_token, s->logits, cfg->vocab_size);
+    int token;
+    CUDA_CHECK(cudaMemcpy(&token, s->next_token, sizeof(int), cudaMemcpyDeviceToHost));
+    return token;
 }

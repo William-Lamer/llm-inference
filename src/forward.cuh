@@ -17,8 +17,10 @@ typedef struct {
     bf16 *hb;          // [intermediate] gate, then silu(gate) * up
     bf16 *hb2;         // [intermediate] up
     bf16 *logits;      // [vocab]
+    int *next_token;   // [1]
 } RunState;
 
 void alloc_run_state(RunState *s, const Config *cfg);
 void free_run_state(RunState *s);
 void forward(const Config *cfg, const Weights *w, RunState *s, int token, int pos);
+int sample_argmax(const Config *cfg, RunState *s);

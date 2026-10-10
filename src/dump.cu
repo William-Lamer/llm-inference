@@ -19,6 +19,10 @@ void dump_open(const char *dir) {
     dump_dir = dir;
 }
 
+void dump_close(void) {
+    dump_dir = NULL;
+}
+
 // The first write of a name in this run truncates the file, after it appends.
 static int seen_before(const char *name) {
     for (int i = 0; i < n_seen; i++) {

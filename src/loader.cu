@@ -69,6 +69,39 @@ static int json_int(const cJSON *root, const char *key) {
     return (int)json_number(root, key);
 }
 
+// either is a single number or an array
+static void load_eos_ids(const char *model_dir, Config *cfg) {
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/generation_config.json", model_dir);
+    char *text = read_text_file(path);
+    cJSON *root = cJSON_Parse(text);
+    if (root == NULL) {
+        fatal("cannot parse %s", path);
+    }
+
+    const cJSON *eos = cJSON_GetObjectItemCaseSensitive(root, "eos_token_id");
+    cfg->n_eos = 0;
+    if (cJSON_IsNumber(eos)) {
+        cfg->eos_ids[0] = eos->valueint;
+        cfg->n_eos = 1;
+    } else if (cJSON_IsArray(eos)) {
+        const cJSON *id;
+        cJSON_ArrayForEach(id, eos) {
+            if (!cJSON_IsNumber(id) || cfg->n_eos == MAX_EOS) {
+                fatal("%s: bad \"eos_token_id\"", path);
+            }
+            cfg->eos_ids[cfg->n_eos] = id->valueint;
+            cfg->n_eos++;
+        }
+    }
+    if (cfg->n_eos == 0) {
+        fatal("%s has no \"eos_token_id\"", path);
+    }
+
+    cJSON_Delete(root);
+    free(text);
+}
+
 void load_config(const char *model_dir, Config *cfg) {
     char path[1024];
     snprintf(path, sizeof(path), "%s/config.json", model_dir);
@@ -101,6 +134,8 @@ void load_config(const char *model_dir, Config *cfg) {
 
     cJSON_Delete(root);
     free(text);
+
+    load_eos_ids(model_dir, cfg);
 }
 
 // safetensors layout: [u64 header length N][N bytes of JSON][tensor data].
