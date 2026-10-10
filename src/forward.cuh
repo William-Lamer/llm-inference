@@ -13,4 +13,4 @@ typedef struct {
 
 void alloc_run_state(RunState *s, const Config *cfg);
 void free_run_state(RunState *s);
-void forward(const Config *cfg, const Weights *w, RunState *s, int token);
+void forward(const Config *cfg, const Weights *w, RunState *s, int token, int pos);

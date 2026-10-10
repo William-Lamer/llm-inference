@@ -21,7 +21,7 @@ void free_run_state(RunState *s) {
     CUDA_CHECK(cudaFree(s->v));
 }
 
-void forward(const Config *cfg, const Weights *w, RunState *s, int token) {
+void forward(const Config *cfg, const Weights *w, RunState *s, int token, int pos) {
     // to be safe
     if (token < 0 || token >= cfg->vocab_size) {
         fprintf(stderr, "forward: token %d outside vocab of %d\n", token, cfg->vocab_size);
@@ -52,4 +52,9 @@ void forward(const Config *cfg, const Weights *w, RunState *s, int token) {
 
     gemv_forward(s->v, layer->wv, s->xb, kv_dim, cfg->hidden_size);
     dump_bf16("L00.v_proj", s->v, kv_dim);
+
+    rope_forward(s->q, cfg->n_heads, cfg->head_dim, pos, cfg->rope_theta);
+    dump_bf16("L00.q_rope", s->q, q_dim);
+    rope_forward(s->k, cfg->n_kv_heads, cfg->head_dim, pos, cfg->rope_theta);
+    dump_bf16("L00.k_rope", s->k, kv_dim);
 }

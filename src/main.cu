@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
         RunState s;
         alloc_run_state(&s, &cfg);
         for (int pos = 0; pos < n_tokens; pos++) {
-            forward(&cfg, &w, &s, tokens[pos]);
+            forward(&cfg, &w, &s, tokens[pos], pos);
         }
         printf("ran %d positions\n", n_tokens);
         free_run_state(&s);

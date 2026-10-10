@@ -83,3 +83,45 @@ void gemv_forward(bf16 *out, const bf16 *w, const bf16 *x, int rows, int cols) {
     gemv_kernel<<<n_blocks, block_size>>>(out, w, x, rows, cols);
     CUDA_CHECK_LAUNCH();
 }
+
+
+// round to bf16 in float32
+static __device__ float round_bf16(float v) {
+    return __bfloat162float(__float2bfloat16(v));
+}
+
+static __global__ void rope_kernel(bf16 *x, int n_heads, int head_dim, int pos, float theta) {
+    int half = head_dim / 2;
+    int t = blockIdx.x * blockDim.x + threadIdx.x;
+    if (t < n_heads * half) {
+        int head = t / half;
+        int j = t % half;
+        bf16 *h = x + head * head_dim;
+
+        float inv_freq = 1.0f / powf(theta, (float)(2 * j) / head_dim);
+        float angle = pos * inv_freq;
+
+        float c = round_bf16(cosf(angle));
+        float s = round_bf16(sinf(angle));
+
+        float a = __bfloat162float(h[j]);
+        float b = __bfloat162float(h[j + half]);
+
+        float a_cos = round_bf16(a * c);
+        float b_sin = round_bf16(b * s);
+        float b_cos = round_bf16(b * c);
+        float a_sin = round_bf16(a * s);
+        h[j] = __float2bfloat16(a_cos - b_sin);
+        h[j + half] = __float2bfloat16(b_cos + a_sin);
+    }
+
+
+}
+
+void rope_forward(bf16 *x, int n_heads, int head_dim, int pos, float theta) {
+    int n_pairs = n_heads * (head_dim) / 2;
+    int block_size = 256;
+    int n_blocks = (n_pairs + block_size - 1) / block_size;
+    rope_kernel<<<n_blocks, block_size>>>(x, n_heads, head_dim, pos, theta);
+    CUDA_CHECK_LAUNCH();
+}
