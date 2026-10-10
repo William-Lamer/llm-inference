@@ -156,3 +156,14 @@ int sample_argmax(const Config *cfg, RunState *s) {
     CUDA_CHECK(cudaMemcpy(&token, s->next_token, sizeof(int), cudaMemcpyDeviceToHost));
     return token;
 }
+
+int sample_temperature(const Config *cfg, RunState *s, float temperature, float coin) {
+    sample_forward(s->next_token, s->logits, cfg->vocab_size, 1.0f / temperature, coin);
+    int token;
+    CUDA_CHECK(cudaMemcpy(&token, s->next_token, sizeof(int), cudaMemcpyDeviceToHost));
+    if (token < 0) {
+        fprintf(stderr, "sampling found no token (coin %g)\n", coin);
+        exit(EXIT_FAILURE);
+    }
+    return token;
+}

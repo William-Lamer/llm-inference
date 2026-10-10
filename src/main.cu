@@ -55,12 +55,35 @@ static int is_eos(const Config *cfg, int token) {
     return 0;
 }
 
-static void generate(const Config *cfg, const Weights *w, RunState *s, int n_prompt, int max_new) {
+// xorshift64*
+static unsigned int random_u32(unsigned long long *state) {
+    *state ^= *state >> 12;
+    *state ^= *state << 25;
+    *state ^= *state >> 27;
+    return (*state * 0x2545F4914F6CDD1Dull) >> 32;
+}
+
+// 23 random bits: at most 1 - 2^-23, so u * total rounds to less than total.
+static float random_f32(unsigned long long *state) {
+    return (random_u32(state) >> 9) / 8388608.0f;
+}
+
+static int sample(const Config *cfg, RunState *s, float temperature, unsigned long long *rng) {
+    if (temperature == 0.0f) {
+        return sample_argmax(cfg, s);
+    }
+    float u = random_f32(rng);
+    return sample_temperature(cfg, s, temperature, u);
+}
+
+
+static void generate(const Config *cfg, const Weights *w, RunState *s, int n_prompt, int max_new, float temperature, unsigned long long seed) {
     double start = now_seconds();
+    unsigned long long rng = seed;
     int pos = n_prompt;
     int n_generated = 0;
     int n_steps = 0;
-    int token = sample_argmax(cfg, s);
+    int token = sample(cfg, s, temperature, &rng);
     while (1) {
         printf("%d ", token);
         fflush(stdout);
@@ -71,7 +94,7 @@ static void generate(const Config *cfg, const Weights *w, RunState *s, int n_pro
         forward(cfg, w, s, token, pos);
         pos++;
         n_steps++;
-        token = sample_argmax(cfg, s);
+        token = sample(cfg, s, temperature, &rng);
     }
     printf("\n");
     fflush(stdout);
@@ -89,6 +112,8 @@ int main(int argc, char **argv) {
     const char *tokens_path = NULL;
     const char *dump_dir = NULL;
     int max_new = 0;
+    float temperature = 0.0f;
+    unsigned long long seed = (unsigned long long)time(NULL);
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--checksums") == 0) {
             checksums = 1;
@@ -102,6 +127,18 @@ int main(int argc, char **argv) {
             i++;
             max_new = atoi(argv[i]);
             if (max_new < 0) {
+                usage(argv[0]);
+            }
+        } else if (strcmp(argv[i], "--temperature") == 0 && i + 1 < argc) {
+            i++;
+            temperature = atof(argv[i]);
+            if (temperature < 0.0f) {
+                usage(argv[0]);
+            }
+        } else if (strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
+            i++;
+            seed = strtoull(argv[i], NULL, 10);
+            if (seed == 0) {
                 usage(argv[0]);
             }
         } else {
@@ -155,7 +192,10 @@ int main(int argc, char **argv) {
         if (max_new > 0) {
             // the reference dumps only cover the prompt
             dump_close();
-            generate(&cfg, &w, &s, n_tokens, max_new);
+            if (temperature > 0.0f) {
+                fprintf(stderr, "temperature %g, seed %llu\n", temperature, seed);
+            }
+            generate(&cfg, &w, &s, n_tokens, max_new, temperature, seed);
         }
         free_run_state(&s);
         free(tokens);

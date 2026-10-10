@@ -24,3 +24,4 @@ void alloc_run_state(RunState *s, const Config *cfg);
 void free_run_state(RunState *s);
 void forward(const Config *cfg, const Weights *w, RunState *s, int token, int pos);
 int sample_argmax(const Config *cfg, RunState *s);
+int sample_temperature(const Config *cfg, RunState *s, float temperature, float u);

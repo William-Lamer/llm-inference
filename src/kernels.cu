@@ -304,3 +304,61 @@ void argmax_forward(int *out, const bf16 *x, int n) {
     CUDA_CHECK_LAUNCH();
 }
 
+
+static __device__ float sample_weight(float x, float max_val, float inv_temp) {
+    return expf((x - max_val) * inv_temp);
+}
+
+// inverse-cdf sampling from softmax(x / temperature).
+static __global__ void sample_kernel(int *out, const bf16 *x, int n, float inv_temp, float u) {
+    __shared__ float chunk_sums[1024];
+
+    float local_max = -INFINITY;
+    for (int i = threadIdx.x; i < n; i += blockDim.x) {
+        local_max = fmaxf(local_max, __bfloat162float(x[i]));
+    }
+    float max_val = block_max(local_max);
+
+    int chunk = (n + blockDim.x - 1) / blockDim.x;
+    int start = threadIdx.x * chunk;
+    int end = min(start + chunk, n);
+    float sum = 0.0f;
+    for (int i = start; i < end; i++) {
+        sum += sample_weight(__bfloat162float(x[i]), max_val, inv_temp);
+    }
+    chunk_sums[threadIdx.x] = sum;
+    __syncthreads();
+
+    if (threadIdx.x != 0) {
+        return;
+    }
+    float total = 0.0f;
+    for (int t = 0; t < blockDim.x; t++) total += chunk_sums[t];
+    float target = u * total;
+
+    // cdf repeats the additions in the same order,
+    float cdf = 0.0f;
+    int t = 0;
+    while (t < blockDim.x - 1 && cdf + chunk_sums[t] <= target) {
+        cdf += chunk_sums[t];
+        t++;
+    }
+    int chosen = -1;
+    int chunk_start = t * chunk;
+    int chunk_end = min(chunk_start + chunk, n);
+    float s = 0.0f;
+    for (int i = chunk_start; i < chunk_end; i++) {
+        s += sample_weight(__bfloat162float(x[i]), max_val, inv_temp);
+        if (cdf + s > target) {
+            chosen = i;
+            break;
+        }
+    }
+    *out = chosen;
+}
+
+// block size must match chunk_sums in sample_kernel
+void sample_forward(int *out, const bf16 *x, int n, float inv_temp, float u) {
+    sample_kernel<<<1, 1024>>>(out, x, n, inv_temp, u);
+    CUDA_CHECK_LAUNCH();
+}
