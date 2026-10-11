@@ -2,6 +2,8 @@
 #include <string.h>
 #include <time.h>
 
+#include <cuda_profiler_api.h>
+
 #include "dump.cuh"
 #include "forward.cuh"
 
@@ -13,7 +15,8 @@ static double now_seconds(void) {
 
 static void usage(const char *prog) {
     fprintf(stderr,
-            "usage: %s <model_dir> [--checksums] [--tokens file] [--dump dir] [--max-new n]\n",
+            "usage: %s <model_dir> [--checksums] [--tokens file] [--dump dir] [--max-new n]\n"
+            "       [--temperature t] [--seed n] [--bench steps] [--runs n]\n",
             prog);
     exit(EXIT_FAILURE);
 }
@@ -103,6 +106,47 @@ static void generate(const Config *cfg, const Weights *w, RunState *s, int n_pro
             n_steps, seconds, n_steps / seconds);
 }
 
+// greedy decode steps after the prompt ignoring EOS so every run has the same length. Run 0 is warmup
+static void bench(const Config *cfg, const Weights *w, RunState *s, const int *tokens,
+                  int n_tokens, int n_steps, int n_runs) {
+    if (n_tokens + n_steps > s->max_seq) {
+        fprintf(stderr, "bench: %d prompt tokens + %d steps is past the kv cache size %d\n",
+                n_tokens, n_steps, s->max_seq);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("weight_bytes_per_step %zu\n", weight_bytes_per_step(cfg));
+    printf("kv_bytes_per_position %zu\n", kv_bytes_per_position(cfg));
+
+    for (int run = 0; run <= n_runs; run++) {
+        for (int pos = 0; pos < n_tokens; pos++) {
+            forward(cfg, w, s, tokens[pos], pos);
+        }
+        int token = sample_argmax(cfg, s);
+
+        if (run > 0) {
+            CUDA_CHECK(cudaProfilerStart());
+        }
+        CUDA_CHECK(cudaDeviceSynchronize());
+        double start = now_seconds();
+        for (int i = 0; i < n_steps; i++) {
+            forward(cfg, w, s, token, n_tokens + i);
+            token = sample_argmax(cfg, s);
+        }
+        CUDA_CHECK(cudaDeviceSynchronize());
+        double seconds = now_seconds() - start;
+        if (run > 0) {
+            CUDA_CHECK(cudaProfilerStop());
+        }
+
+        fprintf(stderr, "%s %d: %d steps in %.3f s (%.2f ms/step)\n", run == 0 ? "warmup" : "run",
+                run, n_steps, seconds, seconds * 1e3 / n_steps);
+        if (run > 0) {
+            printf("run %d %d %.6f\n", run, n_steps, seconds);
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         usage(argv[0]);
@@ -114,6 +158,8 @@ int main(int argc, char **argv) {
     int max_new = 0;
     float temperature = 0.0f;
     unsigned long long seed = (unsigned long long)time(NULL);
+    int bench_steps = 0;
+    int bench_runs = 5;
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--checksums") == 0) {
             checksums = 1;
@@ -141,9 +187,25 @@ int main(int argc, char **argv) {
             if (seed == 0) {
                 usage(argv[0]);
             }
+        } else if (strcmp(argv[i], "--bench") == 0 && i + 1 < argc) {
+            i++;
+            bench_steps = atoi(argv[i]);
+            if (bench_steps <= 0) {
+                usage(argv[0]);
+            }
+        } else if (strcmp(argv[i], "--runs") == 0 && i + 1 < argc) {
+            i++;
+            bench_runs = atoi(argv[i]);
+            if (bench_runs <= 0) {
+                usage(argv[0]);
+            }
         } else {
             usage(argv[0]);
         }
+    }
+    if (bench_steps > 0 && tokens_path == NULL) {
+        fprintf(stderr, "--bench needs --tokens\n");
+        exit(EXIT_FAILURE);
     }
 
     Config cfg;
@@ -184,6 +246,13 @@ int main(int argc, char **argv) {
         }
         RunState s;
         alloc_run_state(&s, &cfg);
+        if (bench_steps > 0) {
+            bench(&cfg, &w, &s, tokens, n_tokens, bench_steps, bench_runs);
+            free_run_state(&s);
+            free(tokens);
+            free_weights(&w);
+            return 0;
+        }
         for (int pos = 0; pos < n_tokens; pos++) {
             forward(&cfg, &w, &s, tokens[pos], pos);
         }

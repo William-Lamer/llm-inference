@@ -122,7 +122,7 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     model = AutoModelForCausalLM.from_pretrained(model_dir, dtype=torch.bfloat16, attn_implementation="eager")
-    model = model.cuda().eval()
+    model = model.cuda().eval()  # pyright: ignore[reportCallIssue]
     n_layers = model.config.num_hidden_layers
     tensors_per_layer = 17
     embed_weight = model.model.embed_tokens.weight

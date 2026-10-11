@@ -17,6 +17,9 @@ $(BUILD)/engine: $(OBJS)
 $(BUILD)/%.o: src/%.cu | $(BUILD)
 	$(NVCC) $(NVCCFLAGS) -MMD -MP -MF $(@:.o=.d) -c -o $@ $<
 
+$(BUILD)/bandwidth: bench/bandwidth.cu src/common.cuh | $(BUILD)
+	$(NVCC) $(NVCCFLAGS) -Isrc -o $@ $<
+
 $(BUILD)/cJSON.o: third_party/cjson/cJSON.c third_party/cjson/cJSON.h | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
@@ -57,6 +60,16 @@ calibrate:
 	uv run ref/calibrate.py --model $(MODEL)
 	uv run ref/compare.py -v $(REF) $(BUILD)/calib/$(notdir $(MODEL))
 
-.PHONY: clean ref check-weights check calibrate
+bench: $(BUILD)/engine $(BUILD)/bandwidth
+	uv run bench/bench.py --model $(MODEL)
+
+# Same as bench, then appends the numbers to bench/results.csv
+record: $(BUILD)/engine $(BUILD)/bandwidth
+	uv run bench/bench.py --model $(MODEL) --record
+
+profile: $(BUILD)/engine
+	uv run bench/breakdown.py --model $(MODEL)
+
+.PHONY: clean ref check-weights check calibrate bench record profile
 
 -include $(OBJS:.o=.d)

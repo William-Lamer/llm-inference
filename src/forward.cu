@@ -60,6 +60,42 @@ static void dump_layer(int l, const char *name, const bf16 *d_data, int n) {
 }
 
 
+// The number of weight bytes that are read for one forward() call 
+size_t weight_bytes_per_step(const Config *cfg) {
+    size_t hidden = cfg->hidden_size;
+    size_t head_dim = cfg->head_dim;
+    size_t q_dim = cfg->n_heads * head_dim;
+    size_t kv_dim = cfg->n_kv_heads * head_dim;
+    size_t inter = cfg->intermediate_size;
+
+    size_t layer = 0;
+    layer += hidden;          // attn_norm
+    layer += q_dim * hidden;  // wq
+    layer += kv_dim * hidden; // wk
+    layer += kv_dim * hidden; // wv
+    layer += head_dim;        // q_norm
+    layer += head_dim;        // k_norm
+    layer += hidden * q_dim;  // wo
+    layer += hidden;          // mlp_norm
+    layer += inter * hidden;  // w_gate
+    layer += inter * hidden;  // w_up
+    layer += hidden * inter;  // w_down
+
+    size_t elements = layer * cfg->n_layers;
+    elements += hidden;                   // final_norm
+    elements += cfg->vocab_size * hidden; // lm_head
+    elements += hidden;                   // one embedding row
+    return elements * sizeof(bf16);
+}
+
+// K and V for one cached position for all layers
+size_t kv_bytes_per_position(const Config *cfg) {
+    size_t kv_dim = cfg->n_kv_heads * (size_t)cfg->head_dim;
+    return 2 * cfg->n_layers * kv_dim * sizeof(bf16);
+}
+
+
+
 void forward(const Config *cfg, const Weights *w, RunState *s, int token, int pos) {
     // to be safe
     if (token < 0 || token >= cfg->vocab_size) {
