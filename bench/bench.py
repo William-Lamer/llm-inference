@@ -52,7 +52,8 @@ def environment():
 
 
 def git_commit():
-    dirty = run(["git", "status", "--porcelain", "--", "src", "bench", "Makefile"])
+    dirty = run(["git", "status", "--porcelain", "--", "src", "bench", "Makefile",
+                 f":!{RESULTS}"])
     if dirty.strip():
         sys.exit("src/, bench/ or Makefile has uncommitted changes: commit before recording\n" + dirty)
     return run(["git", "rev-parse", "--short", "HEAD"]).strip()

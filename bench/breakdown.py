@@ -6,7 +6,7 @@ from pathlib import Path
 
 from transformers import AutoTokenizer
 
-from bench import PROMPT
+from bench import PROMPT, RESULTS, record
 
 OUT = Path("build/profile")
 
@@ -34,6 +34,7 @@ def main():
     parser.add_argument("--model", required=True)
     parser.add_argument("--prompt", default=PROMPT)
     parser.add_argument("--steps", type=int, default=64)
+    parser.add_argument("--record", action="store_true", help=f"append the numbers to {RESULTS}")
     args = parser.parse_args()
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -53,9 +54,9 @@ def main():
     wall_ms = float(run_line.split()[3]) * 1e3 / args.steps
 
     stats = OUT / "stats"
-    run(["nsys", "stats", "--force-export=true", "--report", "cuda_gpu_kern_sum",
-         "--report", "cuda_gpu_mem_time_sum", "--format", "csv", "--output", str(stats),
-         str(report) + ".nsys-rep"])
+    run(["nsys", "stats", "--force-export=true", "--force-overwrite=true",
+         "--report", "cuda_gpu_kern_sum", "--report", "cuda_gpu_mem_time_sum",
+         "--format", "csv", "--output", str(stats), str(report) + ".nsys-rep"])
     kernels = read_report(OUT / "stats_cuda_gpu_kern_sum.csv", "Name")
     copies = read_report(OUT / "stats_cuda_gpu_mem_time_sum.csv", "Operation")
     entries = sorted(kernels + copies, key=lambda e: e[1], reverse=True)
@@ -65,12 +66,28 @@ def main():
     print(f"\n{Path(args.model).name}, prompt {len(prompt)} tokens, {args.steps} decode steps, "
           f"batch 1, bf16 (nsys)")
     print(f"  {'kernel':<34} {'per step':>8} {'us/step':>10} {'us each':>9} {'share':>7}")
+    rows = []
     for name, total, count in entries:
         us_per_step = total / 1e3 / args.steps
-        print(f"  {name:<34} {count / args.steps:8.0f} {us_per_step:10.1f} "
-              f"{total / 1e3 / count:9.2f} {total / gpu_ns:7.1%}")
+        calls = count / args.steps
+        share = total / gpu_ns
+        print(f"  {name:<34} {calls:8.0f} {us_per_step:10.1f} "
+              f"{total / 1e3 / count:9.2f} {share:7.1%}")
+        # "CUDA memcpy Device-to-Device" -> "cuda_memcpy_device_to_device"
+        metric = name.lower().replace(" ", "_").replace("-", "_") + "_us_per_step"
+        rows.append((metric, f"{us_per_step:.1f}", "us",
+                     f"nsys, {calls:.0f} calls per step, {share:.1%} of GPU time"))
+    idle_ms = wall_ms - gpu_ms
     print(f"  GPU busy {gpu_ms:.3f} ms/step, wall {wall_ms:.3f} ms/step under nsys, "
-          f"idle {wall_ms - gpu_ms:.3f} ms/step ({1 - gpu_ms / wall_ms:.1%})")
+          f"idle {idle_ms:.3f} ms/step ({idle_ms / wall_ms:.1%})")
+    rows += [
+        ("gpu_busy_ms_per_step", f"{gpu_ms:.3f}", "ms", "nsys, sum of kernel and copy time"),
+        ("gpu_idle_ms_per_step", f"{idle_ms:.3f}", "ms",
+         f"nsys, wall under nsys minus GPU busy, {idle_ms / wall_ms:.1%} of the step"),
+    ]
+
+    if args.record:
+        record(rows, Path(args.model).name, len(prompt), args.steps)
 
 
 if __name__ == "__main__":

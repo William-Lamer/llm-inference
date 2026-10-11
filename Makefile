@@ -63,9 +63,10 @@ calibrate:
 bench: $(BUILD)/engine $(BUILD)/bandwidth
 	uv run bench/bench.py --model $(MODEL)
 
-# Same as bench, then appends the numbers to bench/results.csv
+# Same as bench and profile, then appends the numbers to bench/results.csv
 record: $(BUILD)/engine $(BUILD)/bandwidth
 	uv run bench/bench.py --model $(MODEL) --record
+	uv run bench/breakdown.py --model $(MODEL) --record
 
 profile: $(BUILD)/engine
 	uv run bench/breakdown.py --model $(MODEL)
