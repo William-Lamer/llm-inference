@@ -6,7 +6,7 @@ Work in progress.
 
 ## Requirements
 
-- NVIDIA GPU and CUDA toolkit 13 (developed on an RTX 4070 Super, `sm_89`, under WSL2)
+- Linux, NVIDIA GPU and CUDA toolkit 13 (developed on an RTX 4070 Super, `sm_89`, on CachyOS)
 - [uv](https://docs.astral.sh/uv/) for the Python reference scripts
 
 ## Setup
