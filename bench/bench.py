@@ -97,21 +97,34 @@ def main():
     copy_out = run(["build/bandwidth"])
     copy_gbs = float(parse(copy_out)[0]["copy_bandwidth_gbs"])
 
-    engine_out = run(["build/engine", args.model, "--tokens", str(tokens_path),
-                      "--bench", str(args.steps), "--runs", str(args.runs)])
+    engine_cmd = ["build/engine", args.model, "--tokens", str(tokens_path),
+                  "--bench", str(args.steps), "--runs", str(args.runs)]
+    engine_out = run(engine_cmd)
     engine_values, engine_runs = parse(engine_out)
     engine_s = statistics.median(engine_runs)
     ms_per_step = engine_s * 1e3 / args.steps
     tok_s = args.steps / engine_s
 
+    # The same steps launched one kernel at a time, to measure what the CUDA graph saves.
+    eager_runs = parse(run(engine_cmd + ["--no-graph"]))[1]
+    eager_s = statistics.median(eager_runs)
+    eager_ms_per_step = eager_s * 1e3 / args.steps
+    eager_tok_s = args.steps / eager_s
+
     rows = [
         ("copy_bandwidth", f"{copy_gbs:.1f}", "GB/s", "device-to-device cudaMemcpy, 512 MiB"),
         ("decode_ms_per_step", f"{ms_per_step:.3f}", "ms", f"median of {args.runs} runs"),
         ("decode_tok_s", f"{tok_s:.1f}", "tok/s", f"median of {args.runs} runs, greedy, batch 1"),
+        ("decode_ms_per_step_no_graph", f"{eager_ms_per_step:.3f}", "ms",
+         f"median of {args.runs} runs, --no-graph (one launch per kernel)"),
+        ("decode_tok_s_no_graph", f"{eager_tok_s:.1f}", "tok/s",
+         f"median of {args.runs} runs, --no-graph (one launch per kernel)"),
     ]
     print(f"\n{model}, prompt {n_prompt} tokens, {args.steps} decode steps, batch 1, bf16")
     print(f"  copy bandwidth      {copy_gbs:8.1f} GB/s ({copy_gbs / SPEC_GBS:.1%} of {SPEC_GBS:.0f})")
     print(f"  engine              {ms_per_step:8.3f} ms/step  {tok_s:8.1f} tok/s")
+    print(f"  engine, no graph    {eager_ms_per_step:8.3f} ms/step  {eager_tok_s:8.1f} tok/s "
+          f"(graph saves {eager_ms_per_step - ms_per_step:.3f} ms/step)")
 
     if "weight_bytes_per_step" in engine_values:
         weight_bytes = int(engine_values["weight_bytes_per_step"])
