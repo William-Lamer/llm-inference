@@ -76,25 +76,42 @@ static __global__ void gemv_kernel(bf16 *out, const bf16 *w, const bf16 *x, int 
         return;
     }
 
-    const bf16 *w_row = w + (size_t)r * cols;
+    // a uint4 is 16 bytes = 8 bf16
+    const uint4 *w_row = (const uint4 *)(w + (size_t)r * cols);
+    const uint4 *x_vec = (const uint4 *)x;
+    int n_vec = cols / 8;
+
     float sum = 0.0f;
-    for (int c = lane; c < cols; c += 32) {
-        float a = __bfloat162float(w_row[c]);
-        float b = __bfloat162float(x[c]);
-        sum += a * b;
+    for (int i = lane; i < n_vec; i += 32) {
+        uint4 w_packed = w_row[i];
+        uint4 x_packed = x_vec[i];
+        const __nv_bfloat162 *w_pairs = (const __nv_bfloat162 *)&w_packed;
+        const __nv_bfloat162 *x_pairs = (const __nv_bfloat162 *)&x_packed;
+
+        // fully unrolled so w_pairs[k] stays in registers
+#pragma unroll
+        for (int k = 0; k < 4; k++) {
+            float2 a = __bfloat1622float2(w_pairs[k]);
+            float2 b = __bfloat1622float2(x_pairs[k]);
+            sum += a.x * b.x;
+            sum += a.y * b.y;
+        }
     }
 
-    for (int offset = 16; offset > 0; offset >>=1) {
+    for (int offset = 16; offset > 0; offset >>= 1) {
         sum += __shfl_down_sync(0xffffffff, sum, offset);
     }
     if (lane == 0) {
         out[r] = __float2bfloat16(sum);
     }
-
-
 }
 
 void gemv_forward(bf16 *out, const bf16 *w, const bf16 *x, int rows, int cols) {
+    // needs to be 16 byte aligned.
+    if (cols % 8 != 0) {
+        fprintf(stderr, "gemv: cols %d is not a multiple of 8\n", cols);
+        exit(1);
+    }
     int block_size = 256;
     int rows_per_block = block_size / 32;
     int n_blocks = (rows + rows_per_block - 1) / rows_per_block;
