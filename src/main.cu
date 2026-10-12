@@ -16,7 +16,7 @@ static double now_seconds(void) {
 static void usage(const char *prog) {
     fprintf(stderr,
             "usage: %s <model_dir> [--checksums] [--tokens file] [--dump dir] [--max-new n]\n"
-            "       [--temperature t] [--seed n] [--bench steps] [--runs n]\n",
+            "       [--temperature t] [--seed n] [--bench steps] [--runs n] [--no-graph]\n",
             prog);
     exit(EXIT_FAILURE);
 }
@@ -160,6 +160,7 @@ int main(int argc, char **argv) {
     unsigned long long seed = (unsigned long long)time(NULL);
     int bench_steps = 0;
     int bench_runs = 5;
+    int use_graph = 1;
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--checksums") == 0) {
             checksums = 1;
@@ -199,6 +200,8 @@ int main(int argc, char **argv) {
             if (bench_runs <= 0) {
                 usage(argv[0]);
             }
+        } else if (strcmp(argv[i], "--no-graph") == 0) {
+            use_graph = 0;
         } else {
             usage(argv[0]);
         }
@@ -246,6 +249,11 @@ int main(int argc, char **argv) {
         }
         RunState s;
         alloc_run_state(&s, &cfg);
+
+        if (use_graph && dump_dir == NULL) {
+            capture_graph(&cfg, &w, &s);
+        }
+        fprintf(stderr, "cuda graph %s\n", s.graph != NULL ? "on" : "off");
         if (bench_steps > 0) {
             bench(&cfg, &w, &s, tokens, n_tokens, bench_steps, bench_runs);
             free_run_state(&s);

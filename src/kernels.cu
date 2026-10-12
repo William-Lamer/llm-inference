@@ -4,18 +4,21 @@
 #include "common.cuh"
 #include "kernels.cuh"
 
-static __global__ void embedding_kernel(bf16 *out, const bf16 *table, int token, int hidden) {
+static __global__ void embedding_kernel(bf16 *out, const bf16 *table, const int *d_token,
+                                        int hidden) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < hidden) {
+        int token = *d_token;
         const bf16 *row = table + (size_t)token * hidden;
         out[i] = row[i];
     }
 }
 
-void embedding_forward(bf16 *out, const bf16 *table, int token, int hidden) {
+void embedding_forward(bf16 *out, const bf16 *table, const int *d_token, int hidden,
+                       cudaStream_t stream) {
     int block_size = 256;
     int n_blocks = (hidden + block_size - 1) / block_size;
-    embedding_kernel<<<n_blocks, block_size>>>(out, table, token, hidden);
+    embedding_kernel<<<n_blocks, block_size, 0, stream>>>(out, table, d_token, hidden);
     CUDA_CHECK_LAUNCH();
 }
 
@@ -60,9 +63,10 @@ static __global__ void rmsnorm_kernel(bf16 *out, const bf16 *in, const bf16 *wei
     }
 }
 
-void rmsnorm_forward(bf16 *out, const bf16 *in, const bf16 *weight, int rows, int dim, float eps) {
+void rmsnorm_forward(bf16 *out, const bf16 *in, const bf16 *weight, int rows, int dim, float eps,
+                     cudaStream_t stream) {
     int block_size = 256;
-    rmsnorm_kernel<<<rows, block_size>>>(out, in, weight, dim, eps);
+    rmsnorm_kernel<<<rows, block_size, 0, stream>>>(out, in, weight, dim, eps);
     CUDA_CHECK_LAUNCH();
 }
 
@@ -106,7 +110,8 @@ static __global__ void gemv_kernel(bf16 *out, const bf16 *w, const bf16 *x, int 
     }
 }
 
-void gemv_forward(bf16 *out, const bf16 *w, const bf16 *x, int rows, int cols) {
+void gemv_forward(bf16 *out, const bf16 *w, const bf16 *x, int rows, int cols,
+                  cudaStream_t stream) {
     // needs to be 16 byte aligned.
     if (cols % 8 != 0) {
         fprintf(stderr, "gemv: cols %d is not a multiple of 8\n", cols);
@@ -115,7 +120,7 @@ void gemv_forward(bf16 *out, const bf16 *w, const bf16 *x, int rows, int cols) {
     int block_size = 256;
     int rows_per_block = block_size / 32;
     int n_blocks = (rows + rows_per_block - 1) / rows_per_block;
-    gemv_kernel<<<n_blocks, block_size>>>(out, w, x, rows, cols);
+    gemv_kernel<<<n_blocks, block_size, 0, stream>>>(out, w, x, rows, cols);
     CUDA_CHECK_LAUNCH();
 }
 
@@ -124,7 +129,8 @@ static __device__ float round_bf16(float v) {
     return __bfloat162float(__float2bfloat16(v));
 }
 
-static __global__ void rope_kernel(bf16 *x, int n_heads, int head_dim, int pos, float theta) {
+static __global__ void rope_kernel(bf16 *x, int n_heads, int head_dim, const int *d_pos,
+                                   float theta) {
     int half = head_dim / 2;
     int t = blockIdx.x * blockDim.x + threadIdx.x;
     if (t < n_heads * half) {
@@ -132,6 +138,7 @@ static __global__ void rope_kernel(bf16 *x, int n_heads, int head_dim, int pos, 
         int j = t % half;
         bf16 *h = x + head * head_dim;
 
+        int pos = *d_pos;
         float inv_freq = 1.0f / powf(theta, (float)(2 * j) / head_dim);
         float angle = pos * inv_freq;
 
@@ -150,11 +157,12 @@ static __global__ void rope_kernel(bf16 *x, int n_heads, int head_dim, int pos, 
     }
 }
 
-void rope_forward(bf16 *x, int n_heads, int head_dim, int pos, float theta) {
+void rope_forward(bf16 *x, int n_heads, int head_dim, const int *d_pos, float theta,
+                  cudaStream_t stream) {
     int n_pairs = n_heads * (head_dim) / 2;
     int block_size = 256;
     int n_blocks = (n_pairs + block_size - 1) / block_size;
-    rope_kernel<<<n_blocks, block_size>>>(x, n_heads, head_dim, pos, theta);
+    rope_kernel<<<n_blocks, block_size, 0, stream>>>(x, n_heads, head_dim, d_pos, theta);
     CUDA_CHECK_LAUNCH();
 }
 
@@ -191,11 +199,34 @@ static __device__ float block_max(float v) {
     return result;
 }
 
+// Copies k and v into slot *d_pos of one layer's caches. That address is computed on device
+// so the launch arguments stay the same at every position.
+static __global__ void kv_write_kernel(bf16 *key_cache, bf16 *value_cache, const bf16 *k,
+                                       const bf16 *v, const int *d_pos, int kv_dim) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < kv_dim) {
+        int pos = *d_pos;
+        size_t slot = (size_t)pos * kv_dim;
+        key_cache[slot + i] = k[i];
+        value_cache[slot + i] = v[i];
+    }
+}
+
+void kv_write_forward(bf16 *key_cache, bf16 *value_cache, const bf16 *k, const bf16 *v,
+                      const int *d_pos, int kv_dim, cudaStream_t stream) {
+    int block_size = 256;
+    int n_blocks = (kv_dim + block_size - 1) / block_size;
+    kv_write_kernel<<<n_blocks, block_size, 0, stream>>>(key_cache, value_cache, k, v, d_pos,
+                                                        kv_dim);
+    CUDA_CHECK_LAUNCH();
+}
+
 // One block per query head
 static __global__ void attention_kernel(bf16 *out, const bf16 *q, const bf16 *key_cache,
                                         const bf16 *value_cache, float *att, int n_heads,
-                                        int n_kv_heads, int head_dim, int pos, int max_seq,
-                                        float scale) {
+                                        int n_kv_heads, int head_dim, const int *d_pos,
+                                        int max_seq, float scale) {
+    int pos = *d_pos;
     int h = blockIdx.x;
     int n_rep = n_heads / n_kv_heads;
     int kv_head = h / n_rep;
@@ -241,12 +272,13 @@ static __global__ void attention_kernel(bf16 *out, const bf16 *q, const bf16 *ke
 }
 
 void attention_forward(bf16 *out, const bf16 *q, const bf16 *key_cache, const bf16 *value_cache,
-                       float *att, int n_heads, int n_kv_heads, int head_dim, int pos, int max_seq,
-                       float scale) {
+                       float *att, int n_heads, int n_kv_heads, int head_dim, const int *d_pos,
+                       int max_seq, float scale, cudaStream_t stream) {
 
     int block_size = 128;
-    attention_kernel<<<n_heads, block_size>>>(out, q, key_cache, value_cache, att, n_heads,
-                                              n_kv_heads, head_dim, pos, max_seq, scale);
+    attention_kernel<<<n_heads, block_size, 0, stream>>>(out, q, key_cache, value_cache, att,
+                                                         n_heads, n_kv_heads, head_dim, d_pos,
+                                                         max_seq, scale);
     CUDA_CHECK_LAUNCH();
 }
 
@@ -258,10 +290,10 @@ static __global__ void residual_add_kernel(bf16 *x, const bf16 *y, int n) {
     }
 }
 
-void residual_add_forward(bf16 *x, const bf16 *y, int n) {
+void residual_add_forward(bf16 *x, const bf16 *y, int n, cudaStream_t stream) {
     int block_size = 256;
     int n_blocks = (n + block_size - 1) / block_size;
-    residual_add_kernel<<<n_blocks, block_size>>>(x, y, n);
+    residual_add_kernel<<<n_blocks, block_size, 0, stream>>>(x, y, n);
     CUDA_CHECK_LAUNCH();
 }
 
@@ -275,10 +307,10 @@ static __global__ void swiglu_kernel(bf16 *gate, const bf16 *up, int n) {
     }
 }
 
-void swiglu_forward(bf16 *gate, const bf16 *up, int n) {
+void swiglu_forward(bf16 *gate, const bf16 *up, int n, cudaStream_t stream) {
     int block_size = 256;
     int n_blocks = (n + block_size - 1) / block_size;
-    swiglu_kernel<<<n_blocks, block_size>>>(gate, up, n);
+    swiglu_kernel<<<n_blocks, block_size, 0, stream>>>(gate, up, n);
     CUDA_CHECK_LAUNCH();
 }
 
@@ -323,9 +355,9 @@ static __global__ void argmax_kernel(int *out, const bf16 *x, int n) {
     }
 }
 
-void argmax_forward(int *out, const bf16 *x, int n) {
+void argmax_forward(int *out, const bf16 *x, int n, cudaStream_t stream) {
     int block_size = 1024;
-    argmax_kernel<<<1, block_size>>>(out, x, n);
+    argmax_kernel<<<1, block_size, 0, stream>>>(out, x, n);
     CUDA_CHECK_LAUNCH();
 }
 
@@ -382,7 +414,7 @@ static __global__ void sample_kernel(int *out, const bf16 *x, int n, float inv_t
 }
 
 // block size must match chunk_sums in sample_kernel
-void sample_forward(int *out, const bf16 *x, int n, float inv_temp, float u) {
-    sample_kernel<<<1, 1024>>>(out, x, n, inv_temp, u);
+void sample_forward(int *out, const bf16 *x, int n, float inv_temp, float u, cudaStream_t stream) {
+    sample_kernel<<<1, 1024, 0, stream>>>(out, x, n, inv_temp, u);
     CUDA_CHECK_LAUNCH();
 }

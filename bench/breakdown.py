@@ -1,5 +1,6 @@
 import argparse
 import csv
+import statistics
 import subprocess
 import sys
 from pathlib import Path
@@ -43,15 +44,21 @@ def main():
     tokens_path = OUT / "prompt_tokens.txt"
     tokens_path.write_text(" ".join(str(t) for t in prompt) + "\n")
 
-    # The engine wraps its timed decode steps in cudaProfilerStart/Stop, so the capture
-    # skips loading, the prompt and the warmup run.
+
     report = OUT / "engine"
-    engine_out = run(["nsys", "profile", "--trace=cuda", "--capture-range=cudaProfilerApi",
+    engine_out = run(["nsys", "profile", "--trace=cuda", "--cuda-graph-trace=node",
+                      "--capture-range=cudaProfilerApi",
                       "--capture-range-end=stop", "--force-overwrite=true", "-o", str(report),
                       "build/engine", args.model, "--tokens", str(tokens_path),
                       "--bench", str(args.steps), "--runs", "1"])
     run_line = next(line for line in engine_out.splitlines() if line.startswith("run "))
-    wall_ms = float(run_line.split()[3]) * 1e3 / args.steps
+    nsys_wall_ms = float(run_line.split()[3]) * 1e3 / args.steps
+
+    plain_out = run(["build/engine", args.model, "--tokens", str(tokens_path),
+                     "--bench", str(args.steps), "--runs", "3"])
+    run_seconds = [float(line.split()[3]) for line in plain_out.splitlines()
+                   if line.startswith("run ")]
+    wall_ms = statistics.median(run_seconds) * 1e3 / args.steps
 
     stats = OUT / "stats"
     run(["nsys", "stats", "--force-export=true", "--force-overwrite=true",
@@ -78,12 +85,13 @@ def main():
         rows.append((metric, f"{us_per_step:.1f}", "us",
                      f"nsys, {calls:.0f} calls per step, {share:.1%} of GPU time"))
     idle_ms = wall_ms - gpu_ms
-    print(f"  GPU busy {gpu_ms:.3f} ms/step, wall {wall_ms:.3f} ms/step under nsys, "
-          f"idle {idle_ms:.3f} ms/step ({idle_ms / wall_ms:.1%})")
+    print(f"  GPU busy {gpu_ms:.3f} ms/step, wall {wall_ms:.3f} ms/step without nsys "
+          f"({nsys_wall_ms:.3f} under nsys), idle {idle_ms:.3f} ms/step ({idle_ms / wall_ms:.1%})")
     rows += [
         ("gpu_busy_ms_per_step", f"{gpu_ms:.3f}", "ms", "nsys, sum of kernel and copy time"),
         ("gpu_idle_ms_per_step", f"{idle_ms:.3f}", "ms",
-         f"nsys, wall under nsys minus GPU busy, {idle_ms / wall_ms:.1%} of the step"),
+         f"wall without nsys (median of 3 runs) minus GPU busy under nsys, "
+         f"{idle_ms / wall_ms:.1%} of the step"),
     ]
 
     if args.record:
