@@ -68,9 +68,13 @@ record: $(BUILD)/engine $(BUILD)/bandwidth
 	uv run bench/bench.py --model $(MODEL) --record
 	uv run bench/breakdown.py --model $(MODEL) --record
 
+# Same as record, with the displays off and the GPU checked idle first
+record-quiet: $(BUILD)/engine $(BUILD)/bandwidth
+	bench/quiet.sh $(MAKE) record
+
 profile: $(BUILD)/engine
 	uv run bench/breakdown.py --model $(MODEL)
 
-.PHONY: clean ref check-weights check calibrate bench record profile
+.PHONY: clean ref check-weights check calibrate bench record record-quiet profile
 
 -include $(OBJS:.o=.d)
