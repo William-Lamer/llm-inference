@@ -55,6 +55,10 @@ static void write_row(const char *name, const float *row, int n) {
     fclose(f);
 }
 
+int dump_enabled(void) {
+    return dump_dir != NULL;
+}
+
 // cudaMemcpy waits for every kernel launched before it so the dump sees the finished tensor.
 void dump_bf16(const char *name, const bf16 *d_data, int n) {
     if (dump_dir == NULL) {

@@ -14,8 +14,9 @@ typedef struct {
     bf16 *key_cache;       // [n_layers, max_seq, n_kv_heads * head_dim]
     bf16 *value_cache;     // [n_layers, max_seq, n_kv_heads * head_dim]
     int max_seq;           // positions the KV cache holds
-    bf16 *hb;              // [intermediate] gate, then silu(gate) * up
-    bf16 *hb2;             // [intermediate] up
+    bf16 *hb;              // [intermediate] silu(gate) * up
+    bf16 *tap1;            // [max(q_dim, intermediate)] fused-kernel intermediates, for dumps
+    bf16 *tap2;            // [max(q_dim, intermediate)] fused-kernel intermediates, for dumps
     bf16 *logits;          // [vocab]
     int *next_token;       // [1] written by sampling, read by the embedding of the next step
     int *pos;              // [1] read by the kernels so their launch arguments never change
