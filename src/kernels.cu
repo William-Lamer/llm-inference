@@ -67,26 +67,40 @@ void rmsnorm_forward(bf16 *out, const bf16 *in, const bf16 *weight, int rows, in
 }
 
 static __global__ void gemv_kernel(bf16 *out, const bf16 *w, const bf16 *x, int rows, int cols) {
-    int r = blockIdx.x * blockDim.x + threadIdx.x;
-    if (r < rows) {
-        const bf16 *w_row = w + (size_t)r * cols;
-        float sum = 0.0f;
-        for (int c = 0; c < cols; c++) {
-            float a = __bfloat162float(w_row[c]);
-            float b = __bfloat162float(x[c]);
-            sum += a * b;
-        }
+    int t = blockIdx.x * blockDim.x + threadIdx.x;
+    int r = t / 32;
+    int lane = threadIdx.x % 32;
+
+    // r is the warp number. The same for all 32 lanes.
+    if (r >= rows) {
+        return;
+    }
+
+    const bf16 *w_row = w + (size_t)r * cols;
+    float sum = 0.0f;
+    for (int c = lane; c < cols; c += 32) {
+        float a = __bfloat162float(w_row[c]);
+        float b = __bfloat162float(x[c]);
+        sum += a * b;
+    }
+
+    for (int offset = 16; offset > 0; offset >>=1) {
+        sum += __shfl_down_sync(0xffffffff, sum, offset);
+    }
+    if (lane == 0) {
         out[r] = __float2bfloat16(sum);
     }
+
+
 }
 
 void gemv_forward(bf16 *out, const bf16 *w, const bf16 *x, int rows, int cols) {
     int block_size = 256;
-    int n_blocks = (rows + block_size - 1) / block_size;
+    int rows_per_block = block_size / 32;
+    int n_blocks = (rows + rows_per_block - 1) / rows_per_block;
     gemv_kernel<<<n_blocks, block_size>>>(out, w, x, rows, cols);
     CUDA_CHECK_LAUNCH();
 }
-
 
 // round to bf16 in float32
 static __device__ float round_bf16(float v) {
@@ -117,8 +131,6 @@ static __global__ void rope_kernel(bf16 *x, int n_heads, int head_dim, int pos, 
         h[j] = __float2bfloat16(a_cos - b_sin);
         h[j + half] = __float2bfloat16(b_cos + a_sin);
     }
-
-
 }
 
 void rope_forward(bf16 *x, int n_heads, int head_dim, int pos, float theta) {
@@ -128,7 +140,6 @@ void rope_forward(bf16 *x, int n_heads, int head_dim, int pos, float theta) {
     rope_kernel<<<n_blocks, block_size>>>(x, n_heads, head_dim, pos, theta);
     CUDA_CHECK_LAUNCH();
 }
-
 
 // the total over the whole block, returned to every thread.
 static __device__ float block_sum(float v) {
@@ -162,7 +173,6 @@ static __device__ float block_max(float v) {
     for (int w = 0; w < n_warps; w++) result = fmaxf(result, partials[w]);
     return result;
 }
-
 
 // One block per query head
 static __global__ void attention_kernel(bf16 *out, const bf16 *q, const bf16 *key_cache,
@@ -223,7 +233,6 @@ void attention_forward(bf16 *out, const bf16 *q, const bf16 *key_cache, const bf
     CUDA_CHECK_LAUNCH();
 }
 
-
 static __global__ void residual_add_kernel(bf16 *x, const bf16 *y, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
@@ -238,7 +247,6 @@ void residual_add_forward(bf16 *x, const bf16 *y, int n) {
     residual_add_kernel<<<n_blocks, block_size>>>(x, y, n);
     CUDA_CHECK_LAUNCH();
 }
-
 
 static __global__ void swiglu_kernel(bf16 *gate, const bf16 *up, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -258,7 +266,7 @@ void swiglu_forward(bf16 *gate, const bf16 *up, int n) {
 }
 
 // keeps the larger value, but on a tie keeps the lowest index.
-static __device__ void argmax_pair(float *val, int *idx, float second_val, int second_idx){
+static __device__ void argmax_pair(float *val, int *idx, float second_val, int second_idx) {
     if (second_val > *val || (second_val == *val && second_idx < *idx)) {
         *val = second_val;
         *idx = second_idx;
@@ -303,7 +311,6 @@ void argmax_forward(int *out, const bf16 *x, int n) {
     argmax_kernel<<<1, block_size>>>(out, x, n);
     CUDA_CHECK_LAUNCH();
 }
-
 
 static __device__ float sample_weight(float x, float max_val, float inv_temp) {
     return expf((x - max_val) * inv_temp);
