@@ -280,3 +280,132 @@ date,commit,model,metric,value,unit,prompt_tokens,gen_tokens,gpu,driver,cuda,os,
 2026-10-13,e34ff89,Qwen3-0.6B,speedup_vs_hf,7.45,x,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / hf_decode_tok_s
 2026-10-13,e34ff89,Qwen3-0.6B,llamacpp_decode_tok_s,309.5,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"llama.cpp ecdd29e llama-bench, CUDA, BF16 GGUF, default flags, tg64 at depth 5, median of 5 runs"
 2026-10-13,e34ff89,Qwen3-0.6B,speedup_vs_llamacpp,1.04,x,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / llamacpp_decode_tok_s
+2026-10-13,f0420e6,Qwen3-0.6B,copy_bandwidth,431.6,GB/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"device-to-device cudaMemcpy, 512 MiB"
+2026-10-13,f0420e6,Qwen3-0.6B,read_bandwidth,478.5,GB/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"read-only uint4 kernel, 512 MiB, fastest of 12 launch shapes"
+2026-10-13,f0420e6,Qwen3-0.6B,decode_ms_per_step,3.434,ms,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,median of 5 runs
+2026-10-13,f0420e6,Qwen3-0.6B,decode_tok_s,291.2,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, greedy, batch 1"
+2026-10-13,f0420e6,Qwen3-0.6B,decode_ms_per_step_no_graph,3.560,ms,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-0.6B,decode_tok_s_no_graph,280.9,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-0.6B,bytes_per_step,1207412736,B,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,weights + mean kv cache read
+2026-10-13,f0420e6,Qwen3-0.6B,effective_bandwidth,351.6,GB/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,bytes_per_step / ms_per_step
+2026-10-13,f0420e6,Qwen3-0.6B,roofline_pct_spec,69.8,%,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of 504 GB/s
+2026-10-13,f0420e6,Qwen3-0.6B,roofline_pct_measured,81.5,%,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of copy_bandwidth
+2026-10-13,f0420e6,Qwen3-0.6B,roofline_pct_read,73.5,%,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of read_bandwidth
+2026-10-13,f0420e6,Qwen3-0.6B,hf_decode_tok_s,41.9,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"transformers eager bf16, sdpa attention, KV cache, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-0.6B,speedup_vs_hf,6.94,x,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / hf_decode_tok_s
+2026-10-13,f0420e6,Qwen3-0.6B,llamacpp_decode_tok_s,305.7,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"llama.cpp ecdd29e llama-bench, CUDA, BF16 GGUF, default flags, tg256 at depth 5, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-0.6B,speedup_vs_llamacpp,0.95,x,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / llamacpp_decode_tok_s
+2026-10-13,f0420e6,Qwen3-0.6B,gate_up_kernel_us_per_step,778.6,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 28 calls per step, 24.9% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,gemv_residual_kernel_us_per_step,685.4,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 56 calls per step, 21.9% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,gemv_kernel_us_per_step,653.9,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 20.9% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,qkv_kernel_us_per_step,523.3,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 28 calls per step, 16.7% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,attention_kernel_us_per_step,253.4,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 28 calls per step, 8.1% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,rmsnorm_kernel_us_per_step,138.6,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 57 calls per step, 4.4% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,qk_norm_rope_kernel_us_per_step,50.7,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 28 calls per step, 1.6% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,argmax_kernel_us_per_step,38.1,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 1.2% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,embedding_kernel_us_per_step,1.3,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 0.0% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,cuda_memcpy_device_to_host_us_per_step,0.8,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 0.0% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,cuda_memcpy_host_to_device_us_per_step,0.6,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 2 calls per step, 0.0% of GPU time"
+2026-10-13,f0420e6,Qwen3-0.6B,gpu_busy_ms_per_step,3.125,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, sum of kernel and copy time"
+2026-10-13,f0420e6,Qwen3-0.6B,gpu_idle_ms_per_step,-0.005,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"wall without nsys (median of 3 runs) minus GPU busy under nsys, -0.2% of the step"
+2026-10-13,f0420e6,Qwen3-1.7B,copy_bandwidth,431.2,GB/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"device-to-device cudaMemcpy, 512 MiB"
+2026-10-13,f0420e6,Qwen3-1.7B,read_bandwidth,478.4,GB/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"read-only uint4 kernel, 512 MiB, fastest of 12 launch shapes"
+2026-10-13,f0420e6,Qwen3-1.7B,decode_ms_per_step,8.238,ms,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,median of 5 runs
+2026-10-13,f0420e6,Qwen3-1.7B,decode_tok_s,121.4,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, greedy, batch 1"
+2026-10-13,f0420e6,Qwen3-1.7B,decode_ms_per_step_no_graph,8.373,ms,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-1.7B,decode_tok_s_no_graph,119.4,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-1.7B,bytes_per_step,3456464896,B,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,weights + mean kv cache read
+2026-10-13,f0420e6,Qwen3-1.7B,effective_bandwidth,419.6,GB/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,bytes_per_step / ms_per_step
+2026-10-13,f0420e6,Qwen3-1.7B,roofline_pct_spec,83.2,%,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of 504 GB/s
+2026-10-13,f0420e6,Qwen3-1.7B,roofline_pct_measured,97.3,%,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of copy_bandwidth
+2026-10-13,f0420e6,Qwen3-1.7B,roofline_pct_read,87.7,%,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of read_bandwidth
+2026-10-13,f0420e6,Qwen3-1.7B,hf_decode_tok_s,41.3,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"transformers eager bf16, sdpa attention, KV cache, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-1.7B,speedup_vs_hf,2.94,x,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / hf_decode_tok_s
+2026-10-13,f0420e6,Qwen3-1.7B,llamacpp_decode_tok_s,124.9,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"llama.cpp ecdd29e llama-bench, CUDA, BF16 GGUF, default flags, tg256 at depth 5, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-1.7B,speedup_vs_llamacpp,0.97,x,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / llamacpp_decode_tok_s
+2026-10-13,f0420e6,Qwen3-1.7B,gate_up_kernel_us_per_step,2995.4,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 28 calls per step, 37.7% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,gemv_residual_kernel_us_per_step,2045.8,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 56 calls per step, 25.8% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,gemv_kernel_us_per_step,1302.9,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 16.4% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,qkv_kernel_us_per_step,1015.4,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 28 calls per step, 12.8% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,attention_kernel_us_per_step,254.8,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 28 calls per step, 3.2% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,rmsnorm_kernel_us_per_step,227.4,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 57 calls per step, 2.9% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,qk_norm_rope_kernel_us_per_step,52.7,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 28 calls per step, 0.7% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,argmax_kernel_us_per_step,40.0,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 0.5% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,embedding_kernel_us_per_step,1.4,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 0.0% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,cuda_memcpy_device_to_host_us_per_step,0.9,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 0.0% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,cuda_memcpy_host_to_device_us_per_step,0.6,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 2 calls per step, 0.0% of GPU time"
+2026-10-13,f0420e6,Qwen3-1.7B,gpu_busy_ms_per_step,7.937,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, sum of kernel and copy time"
+2026-10-13,f0420e6,Qwen3-1.7B,gpu_idle_ms_per_step,-0.011,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"wall without nsys (median of 3 runs) minus GPU busy under nsys, -0.1% of the step"
+2026-10-13,f0420e6,Qwen3-4B,copy_bandwidth,431.2,GB/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"device-to-device cudaMemcpy, 512 MiB"
+2026-10-13,f0420e6,Qwen3-4B,read_bandwidth,478.6,GB/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"read-only uint4 kernel, 512 MiB, fastest of 12 launch shapes"
+2026-10-13,f0420e6,Qwen3-4B,decode_ms_per_step,18.197,ms,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,median of 5 runs
+2026-10-13,f0420e6,Qwen3-4B,decode_tok_s,55.0,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, greedy, batch 1"
+2026-10-13,f0420e6,Qwen3-4B,decode_ms_per_step_no_graph,18.379,ms,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-4B,decode_tok_s_no_graph,54.4,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-4B,bytes_per_step,8064626688,B,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,weights + mean kv cache read
+2026-10-13,f0420e6,Qwen3-4B,effective_bandwidth,443.2,GB/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,bytes_per_step / ms_per_step
+2026-10-13,f0420e6,Qwen3-4B,roofline_pct_spec,87.9,%,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of 504 GB/s
+2026-10-13,f0420e6,Qwen3-4B,roofline_pct_measured,102.8,%,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of copy_bandwidth
+2026-10-13,f0420e6,Qwen3-4B,roofline_pct_read,92.6,%,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of read_bandwidth
+2026-10-13,f0420e6,Qwen3-4B,hf_decode_tok_s,32.2,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"transformers eager bf16, sdpa attention, KV cache, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-4B,speedup_vs_hf,1.71,x,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / hf_decode_tok_s
+2026-10-13,f0420e6,Qwen3-4B,llamacpp_decode_tok_s,55.9,tok/s,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"llama.cpp ecdd29e llama-bench, CUDA, BF16 GGUF, default flags, tg256 at depth 5, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-4B,speedup_vs_llamacpp,0.98,x,5,256,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / llamacpp_decode_tok_s
+2026-10-13,f0420e6,Qwen3-4B,gate_up_kernel_us_per_step,7553.3,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 36 calls per step, 42.4% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,gemv_residual_kernel_us_per_step,5442.9,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 72 calls per step, 30.5% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,qkv_kernel_us_per_step,2409.9,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 36 calls per step, 13.5% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,gemv_kernel_us_per_step,1626.9,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 9.1% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,rmsnorm_kernel_us_per_step,351.8,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 73 calls per step, 2.0% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,attention_kernel_us_per_step,325.3,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 36 calls per step, 1.8% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,qk_norm_rope_kernel_us_per_step,67.9,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 36 calls per step, 0.4% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,argmax_kernel_us_per_step,40.5,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 0.2% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,embedding_kernel_us_per_step,1.3,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 0.0% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,cuda_memcpy_device_to_host_us_per_step,0.8,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 1 calls per step, 0.0% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,cuda_memcpy_host_to_device_us_per_step,0.6,us,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, 2 calls per step, 0.0% of GPU time"
+2026-10-13,f0420e6,Qwen3-4B,gpu_busy_ms_per_step,17.821,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"nsys, sum of kernel and copy time"
+2026-10-13,f0420e6,Qwen3-4B,gpu_idle_ms_per_step,-0.027,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"wall without nsys (median of 3 runs) minus GPU busy under nsys, -0.2% of the step"
+2026-10-13,f0420e6,Qwen3-0.6B,copy_bandwidth,431.3,GB/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"device-to-device cudaMemcpy, 512 MiB"
+2026-10-13,f0420e6,Qwen3-0.6B,read_bandwidth,478.7,GB/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"read-only uint4 kernel, 512 MiB, fastest of 12 launch shapes"
+2026-10-13,f0420e6,Qwen3-0.6B,decode_ms_per_step,3.122,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,median of 5 runs
+2026-10-13,f0420e6,Qwen3-0.6B,decode_tok_s,320.3,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, greedy, batch 1"
+2026-10-13,f0420e6,Qwen3-0.6B,decode_ms_per_step_no_graph,3.251,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-0.6B,decode_tok_s_no_graph,307.6,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-0.6B,bytes_per_step,1196402688,B,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,weights + mean kv cache read
+2026-10-13,f0420e6,Qwen3-0.6B,effective_bandwidth,383.3,GB/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,bytes_per_step / ms_per_step
+2026-10-13,f0420e6,Qwen3-0.6B,roofline_pct_spec,76.0,%,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of 504 GB/s
+2026-10-13,f0420e6,Qwen3-0.6B,roofline_pct_measured,88.9,%,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of copy_bandwidth
+2026-10-13,f0420e6,Qwen3-0.6B,roofline_pct_read,80.1,%,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of read_bandwidth
+2026-10-13,f0420e6,Qwen3-0.6B,hf_decode_tok_s,42.1,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"transformers eager bf16, sdpa attention, KV cache, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-0.6B,speedup_vs_hf,7.61,x,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / hf_decode_tok_s
+2026-10-13,f0420e6,Qwen3-0.6B,llamacpp_decode_tok_s,309.3,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"llama.cpp ecdd29e llama-bench, CUDA, BF16 GGUF, default flags, tg64 at depth 5, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-0.6B,speedup_vs_llamacpp,1.04,x,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / llamacpp_decode_tok_s
+2026-10-13,f0420e6,Qwen3-1.7B,copy_bandwidth,431.7,GB/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"device-to-device cudaMemcpy, 512 MiB"
+2026-10-13,f0420e6,Qwen3-1.7B,read_bandwidth,478.7,GB/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"read-only uint4 kernel, 512 MiB, fastest of 12 launch shapes"
+2026-10-13,f0420e6,Qwen3-1.7B,decode_ms_per_step,7.923,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,median of 5 runs
+2026-10-13,f0420e6,Qwen3-1.7B,decode_tok_s,126.2,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, greedy, batch 1"
+2026-10-13,f0420e6,Qwen3-1.7B,decode_ms_per_step_no_graph,8.062,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-1.7B,decode_tok_s_no_graph,124.0,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-1.7B,bytes_per_step,3445454848,B,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,weights + mean kv cache read
+2026-10-13,f0420e6,Qwen3-1.7B,effective_bandwidth,434.9,GB/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,bytes_per_step / ms_per_step
+2026-10-13,f0420e6,Qwen3-1.7B,roofline_pct_spec,86.3,%,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of 504 GB/s
+2026-10-13,f0420e6,Qwen3-1.7B,roofline_pct_measured,100.7,%,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of copy_bandwidth
+2026-10-13,f0420e6,Qwen3-1.7B,roofline_pct_read,90.8,%,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of read_bandwidth
+2026-10-13,f0420e6,Qwen3-1.7B,hf_decode_tok_s,41.8,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"transformers eager bf16, sdpa attention, KV cache, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-1.7B,speedup_vs_hf,3.02,x,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / hf_decode_tok_s
+2026-10-13,f0420e6,Qwen3-1.7B,llamacpp_decode_tok_s,125.6,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"llama.cpp ecdd29e llama-bench, CUDA, BF16 GGUF, default flags, tg64 at depth 5, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-1.7B,speedup_vs_llamacpp,1.01,x,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / llamacpp_decode_tok_s
+2026-10-13,f0420e6,Qwen3-4B,copy_bandwidth,430.7,GB/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"device-to-device cudaMemcpy, 512 MiB"
+2026-10-13,f0420e6,Qwen3-4B,read_bandwidth,478.7,GB/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"read-only uint4 kernel, 512 MiB, fastest of 12 launch shapes"
+2026-10-13,f0420e6,Qwen3-4B,decode_ms_per_step,17.792,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,median of 5 runs
+2026-10-13,f0420e6,Qwen3-4B,decode_tok_s,56.2,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, greedy, batch 1"
+2026-10-13,f0420e6,Qwen3-4B,decode_ms_per_step_no_graph,17.978,ms,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-4B,decode_tok_s_no_graph,55.6,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"median of 5 runs, --no-graph (one launch per kernel)"
+2026-10-13,f0420e6,Qwen3-4B,bytes_per_step,8050470912,B,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,weights + mean kv cache read
+2026-10-13,f0420e6,Qwen3-4B,effective_bandwidth,452.5,GB/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,bytes_per_step / ms_per_step
+2026-10-13,f0420e6,Qwen3-4B,roofline_pct_spec,89.8,%,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of 504 GB/s
+2026-10-13,f0420e6,Qwen3-4B,roofline_pct_measured,105.1,%,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of copy_bandwidth
+2026-10-13,f0420e6,Qwen3-4B,roofline_pct_read,94.5,%,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,of read_bandwidth
+2026-10-13,f0420e6,Qwen3-4B,hf_decode_tok_s,34.1,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"transformers eager bf16, sdpa attention, KV cache, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-4B,speedup_vs_hf,1.65,x,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / hf_decode_tok_s
+2026-10-13,f0420e6,Qwen3-4B,llamacpp_decode_tok_s,56.1,tok/s,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,"llama.cpp ecdd29e llama-bench, CUDA, BF16 GGUF, default flags, tg64 at depth 5, median of 5 runs"
+2026-10-13,f0420e6,Qwen3-4B,speedup_vs_llamacpp,1.00,x,5,64,NVIDIA GeForce RTX 4070 SUPER,615.78.08,13.4,CachyOS,decode_tok_s / llamacpp_decode_tok_s
