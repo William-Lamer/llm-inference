@@ -189,7 +189,7 @@ Next steps are a flash-decoding attention kernel (to fix the long-context gap wi
 - Andrej Karpathy's [llama2.c](https://github.com/karpathy/llama2.c) and [llm.c](https://github.com/karpathy/llm.c) were very useful for the approach.
 - [Hugging Face transformers](https://github.com/huggingface/transformers) is the reference for correctness, and [llama.cpp](https://github.com/ggml-org/llama.cpp) is the reference for performance.
 - [Qwen3](https://huggingface.co/Qwen) models by the Qwen team.
-
+- Claude: My goal was to learn, so I wrote every kernel by hand as well as the decode loop etc (everything I considered important). However I used AI help for stuff like checking HF tensor weights, obtaining the HF intermediate tensors to verifiy correctness, benchmarking llama.cpp, plotting the results etc as I did not have much experience with that.
 
 ## License
 
