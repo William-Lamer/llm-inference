@@ -33,7 +33,7 @@ I'm super interested in ML and low level stuff. I wanted to learn and explore ho
 
 ## How a Decode Step Works
 
-At batch size 1, generating one token means reading every weight in the model once (1.2 GB on 0.6B, 8 GB on 4B) to do a small amount of math with it. So the decode is mostly memory-bound. That's why everything here is measured as "% of bandwidth", its the bytes read per token divided by time per token compared with what the GPU can read.
+At batch size 1, generating one token means reading every weight in the model once (1.2 GB on 0.6B, 8 GB on 4B) to do a small amount of math with it. So the decode is mostly memory-bound. That's why everything here is measured as "% of bandwidth", it's the bytes read per token divided by time per token compared with what the GPU can read.
 
 Each step is 228 kernels. All of them except the sampling kernel are captured once in a CUDA graph and replayed every token. One decoder layer is 8 of them:
 
@@ -54,7 +54,7 @@ x -> next layer (28 layers on 0.6B and 1.7B, 36 on 4B)
 
 Apart from the layers there is an embedding lookup at the start, and at the end a final RMSNorm, the LM head GEMV and an argmax, or temperature sampling on the GPU.
 
-There's nothing harcoded so the same code can run all three model sizes. Every shape comes from the model's `config.json`, and the loader checks every tensor in the safetensors files against the shape the config gives before anything runs.
+There's nothing hardcoded so the same code can run all three model sizes. Every shape comes from the model's `config.json`, and the loader checks every tensor in the safetensors files against the shape the config gives before anything runs.
 
 
 ## The Optimization Process
@@ -92,15 +92,15 @@ The GEMVs read at 94 to 99% of the read peak, so the main kernel is basically at
 
 **Why only the decode path?**
 
-The prompt is fed through the decode path one token at a time (like llama2.c), so getting correct end-to-end generation only needed GEMV-style kernels and no matrix-matrix multiply. That kept v1 small enough to finish and verify. The cost is that the engine makes no claim about time-to-first-token. A real prefill path (tiled GEMM, causal attention) is the next big piece.
+The prompt is fed through the decode path one token at a time (like llama2.c), so getting the correct end-to-end generation only needed GEMV-style kernels and no matrix-matrix multiply. That kept this first version small enough to finish and verify. A real prefill path (tiled GEMM, causal attention) is one of the next big piece I will do.
 
 **Why copy Hugging Face's bf16 rounding points?**
 
-Activations are stored in bf16 like HF and every kernel accumulates in fp32, rounding to bf16 at the same places HF does (after each projection, inside RMSNorm, SwiGLU and attention). That way the only difference from the reference is summation order, so the correctness check can be tight and a real bug stands out immediately.
+Activations are stored in bf16 like HF and every kernel accumulates in fp32, rounding to bf16 at the same places HF does (after each projection, inside RMSNorm, SwiGLU and attention). That way the only difference from the HF reference is the summation order, so the correctness check can precise and a real bug is visible immediately.
 
 **Why one warp per output row in the GEMV?**
 
-A GEMV reads each weight exactly once, so the only thing that matters is reading memory efficiently. With a warp per row, the 32 threads read 32 consecutive 16-byte chunks of the same row, which the hardware combines into full 512-byte transactions. It's simple, and on the big matrices it already reads at 98% of the measured peak.
+A GEMV reads each weight exactly once so the only thing that matters is reading the memory efficiently. With a warp per row, the 32 threads read 32 consecutive 16-byte chunks of the same row, which the hardware combines into a full 512-byte transaction. It's simple, and on the big matrices it already reads at 98% of the measured peak.
 
 **How are fused kernels still checked layer by layer?**
 
@@ -108,7 +108,7 @@ Fusing kernels hides the intermediate tensors the correctness harness compares (
 
 **Why no CPU reference implementation?**
 
-Hugging Face transformers is the reference. A Python script runs the same prompts through it and dumps every intermediate tensor, and the engine dumps it's own in the same format. Comparing the two in forward order points at the exact op that's wrong, which is a lot more useful than "the logits are off".
+Hugging Face transformers is the reference. A Python script runs the same prompts through it and dumps every intermediate tensor while engine dumps its own in the same format. Comparing the two in forward order points at the exact operation that's wrong.
 
 
 ## Correctness
@@ -126,7 +126,7 @@ How the numbers are measured:
 - `make record-quiet` is a custom script that would turn my displays off and check that the GPU was idle first for consistency.
 - Median of 5 runs after a warmup run, wall clock between `cudaDeviceSynchronize` calls.
 - Bytes per token are counted exactly from the model shapes (all weights, the tied embedding table once, the average KV cache read).
-- The "measured read bandwidth" is a read-only kernel in `bench/bandwidth.cu` (16-byte loads over a 512 MiB buffer, fastest of 12 launch shapes): 478.5 GB/s, 95% of the spec. A device-to-device copy only reaches 431 GB/s because it also writes, which doesn't make it correct the correct number to use for comparing decode.
+- The "measured read bandwidth" is a read-only kernel in `bench/bandwidth.cu` (16-byte loads over a 512 MiB buffer, fastest of 12 launch shapes): 478.5 GB/s, 95% of the spec. A device-to-device copy only reaches 431 GB/s because it also writes, which doesn't make it the correct number to use for comparing decode.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/bandwidth-dark.png">
@@ -140,7 +140,7 @@ How the numbers are measured:
   <img alt="Decode speed of this engine relative to llama.cpp at 64 and 256 generated tokens" src="docs/vs-llamacpp-light.png">
 </picture>
 
-**Important to note:** the engine is similar to llama.cpp or ahead on short generations, but 2 to 5% behind over 256 tokens. My GEMVs are faster (about 2.64 ms vs 2.90 ms per token on 0.6B), but my attention kernel uses one block per head and loops over the cached positions serially, so it does get slower as the context grows (0.25 ms per token at 64 tokens, 0.57 ms at 256). llama.cpp splits the sequence across blocks and merges the partial results (flash-decoding), so its attention stays around 0.16 ms. That's a real improvement over mine and is probably the next thing I will implement. Also, llama-bench never samples while my engine does an argmax every step, so the comparison slightly favour llama.cpp.
+**Important to note:** the engine is similar to llama.cpp or ahead on short generations, but 2 to 5% behind over 256 tokens. My GEMVs are faster (about 2.64 ms vs 2.90 ms per token on 0.6B), but my attention kernel uses one block per head and loops over the cached positions serially, so it does get slower as the context grows (0.25 ms per token at 64 tokens, 0.57 ms at 256). llama.cpp splits the sequence across blocks and merges the partial results (flash-decoding), so its attention stays around 0.16 ms. That's a real improvement over mine and is probably the next thing I will implement. Also, llama-bench never samples while my engine does an argmax every step, so the comparison slightly favours llama.cpp.
 
 **Hugging Face transformers** (eager, bf16, sdpa attention, KV cache) is 1.7x to 6.9x slower, but it's not a fair comparison at batch 1 since it's limited by Python and kernel launch overhead on the CPU, which is why it takes about 24 ms per token on both 0.6B and 1.7B even though 1.7B has 3x the bytes.
 
