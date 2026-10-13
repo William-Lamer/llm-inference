@@ -78,6 +78,10 @@ record-quiet: $(BUILD)/engine $(BUILD)/bandwidth
 profile: $(BUILD)/engine
 	uv run bench/breakdown.py --model $(MODEL)
 
-.PHONY: clean ref check-weights check calibrate bench record record-quiet profile
+# README charts in docs/, from bench/results.csv
+plots:
+	uv run --with matplotlib python bench/plot.py
+
+.PHONY: clean ref check-weights check calibrate bench record record-quiet profile plots
 
 -include $(OBJS:.o=.d)
