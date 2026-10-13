@@ -49,7 +49,7 @@ check: $(BUILD)/engine
 	    d=$(OUT)/$$(basename $$p); \
 	    ./$(BUILD)/engine $(MODEL) --tokens $$p/tokens.txt --dump $$d > /dev/null 2> $$d.log || { cat $$d.log; exit 1; }; \
 	done
-	uv run ref/compare.py $(REF) $(OUT)
+	uv run ref/compare.py --known-outliers $(REF) $(OUT)
 	for p in $(REF)/p*; do \
 	    d=$(GREEDY)/$$(basename $$p); \
 	    mkdir -p $$d; \

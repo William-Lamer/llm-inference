@@ -54,7 +54,7 @@ x -> next layer (28 layers on 0.6B and 1.7B, 36 on 4B)
 
 Apart from the layers there is an embedding lookup at the start, and at the end a final RMSNorm, the LM head GEMV and an argmax, or temperature sampling on the GPU.
 
-Thre's nothing harcoded so the same code can run all three model sizes. Every shape comes from the model's `config.json`, and the loader checks every tensor in the safetensors files against the shape the config gives before anything runs.
+There's nothing harcoded so the same code can run all three model sizes. Every shape comes from the model's `config.json`, and the loader checks every tensor in the safetensors files against the shape the config gives before anything runs.
 
 
 ## The Optimization Process
@@ -69,7 +69,7 @@ Every step below was measured on Qwen3-0.6B. Every element was a different optim
 | step | ms/token | what changed |
 | --- | ---: | --- |
 | original GEMV (`e1ea710`) | 32.22 | One thread per output row. It's slow because adjacent threads read addresses a row apart so there's almost no coalescing (16.5 memory sectors per request instead of 2), and the small matrices only launched 4 to 12 blocks for 56 SMs. |
-| warp per row (`23a495f`) | 4.02 | 32 threads share a row and read consecutive addresses then reduce with a warp shuffles. 8x performance in one change. |
+| warp per row (`23a495f`) | 4.02 | 32 threads share a row and read consecutive addresses then reduce with a warp shuffle. 8x performance in one change. |
 | 16-byte loads (`94f1811`) | 4.00 | `uint4` loads of 8 bf16 at a time.|
 | CUDA graph (`9bee197`) | 3.69 | The whole step is captured once and replayed with a single launch which removes the CPU overhead between the roughly 500 kernels.|
 | kernel fusion (`a5ef78e`) | 3.44 | Went from 508 kernels per step to 228: q/k/v in one launch, gate/up/SwiGLU in one, residual adds folded into the GEMVs, QK-norm + RoPE + KV in one. |
@@ -116,7 +116,7 @@ Hugging Face transformers is the reference. A Python script runs the same prompt
 - `make check-weights`: every tensor on the GPU matches the safetensors file bit for bit.
 - `make check`: 6 prompts, every intermediate tensor of every layer (479 to 615 per prompt) compared against HF by the worst relative error, then greedy generation compared token by token.
 - Greedy output matches HF exactly (except for ties when HF's top two logits are equal or very close and both choices are correct).
- - A few single rows on 1.7B and on 0.6B go over the testing tolerance. Each were looked at and are confirmed to just be rouding imprecision.
+ - A few single rows on 1.7B and on 0.6B go over the testing tolerance. Each were looked at and are confirmed to just be rounding imprecision.
 - `compute-sanitizer` memcheck clean on all three sizes, racecheck clean on 0.6B.
 
 
@@ -164,7 +164,7 @@ Testing and benchmarking (`MODEL=models/Qwen3-1.7B` etc for other sizes):
 ```bash
 make ref             # dump Hugging Face reference activations for the prompt set
 make check-weights   # GPU weights vs the safetensors files
-make check           # layerb by layer comparison, then greedy output vs HF
+make check           # layer by layer comparison, then greedy output vs HF
 make bench           # tokens/s, % of bandwidth, HF baseline and llama.cpp
 make record-quiet    # same, displays off, appended to bench/results.csv
 make profile         # per-kernel time per token with nsys
@@ -189,7 +189,7 @@ Next steps are a flash-decoding attention kernel (to fix the long-context gap wi
 - Andrej Karpathy's [llama2.c](https://github.com/karpathy/llama2.c) and [llm.c](https://github.com/karpathy/llm.c) were very useful for the approach.
 - [Hugging Face transformers](https://github.com/huggingface/transformers) is the reference for correctness, and [llama.cpp](https://github.com/ggml-org/llama.cpp) is the reference for performance.
 - [Qwen3](https://huggingface.co/Qwen) models by the Qwen team.
-- Claude: My goal was to learn, so I wrote every kernel by hand as well as the decode loop etc (everything I considered important). However I used AI help for stuff like checking HF tensor weights, obtaining the HF intermediate tensors to verifiy correctness, benchmarking llama.cpp, plotting the results etc as I did not have much experience with that.
+- Claude: My goal was to learn, so I wrote every kernel by hand as well as the foward pass, decode loop etc (everything I considered important). However I used AI help for tooling around it like checking HF tensor weights, obtaining the HF intermediate tensors to verify correctness, benchmarking llama.cpp, plotting the results, writing a benchmark script that automatically turned off my displays for reduced GPU usage etc as I did not have much experience with that.
 
 ## License
 
