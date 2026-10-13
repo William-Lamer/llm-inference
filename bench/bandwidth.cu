@@ -5,7 +5,8 @@
 #include "common.cuh"
 
 #define COPY_BYTES ((size_t)512 << 20)
-#define WARMUP 3
+// Needed a lot of warmup steps to actualy up to speed
+#define WARMUP 200
 #define RUNS 20
 
 static int compare_floats(const void *a, const void *b) {
