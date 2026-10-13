@@ -97,8 +97,9 @@ def main():
     tokens_path.write_text(" ".join(str(t) for t in prompt) + "\n")
     n_prompt = len(prompt)
 
-    copy_out = run(["build/bandwidth"])
-    copy_gbs = float(parse(copy_out)[0]["copy_bandwidth_gbs"])
+    bandwidth = parse(run(["build/bandwidth"]))[0]
+    copy_gbs = float(bandwidth["copy_bandwidth_gbs"])
+    read_gbs = float(bandwidth["read_bandwidth_gbs"])
 
     engine_cmd = ["build/engine", args.model, "--tokens", str(tokens_path),
                   "--bench", str(args.steps), "--runs", str(args.runs)]
@@ -116,6 +117,8 @@ def main():
 
     rows = [
         ("copy_bandwidth", f"{copy_gbs:.1f}", "GB/s", "device-to-device cudaMemcpy, 512 MiB"),
+        ("read_bandwidth", f"{read_gbs:.1f}", "GB/s",
+         "read-only uint4 kernel, 512 MiB, fastest of 12 launch shapes"),
         ("decode_ms_per_step", f"{ms_per_step:.3f}", "ms", f"median of {args.runs} runs"),
         ("decode_tok_s", f"{tok_s:.1f}", "tok/s", f"median of {args.runs} runs, greedy, batch 1"),
         ("decode_ms_per_step_no_graph", f"{eager_ms_per_step:.3f}", "ms",
@@ -125,6 +128,7 @@ def main():
     ]
     print(f"\n{model}, prompt {n_prompt} tokens, {args.steps} decode steps, batch 1, bf16")
     print(f"  copy bandwidth      {copy_gbs:8.1f} GB/s ({copy_gbs / SPEC_GBS:.1%} of {SPEC_GBS:.0f})")
+    print(f"  read bandwidth      {read_gbs:8.1f} GB/s ({read_gbs / SPEC_GBS:.1%} of {SPEC_GBS:.0f})")
     print(f"  engine              {ms_per_step:8.3f} ms/step  {tok_s:8.1f} tok/s")
     print(f"  engine, no graph    {eager_ms_per_step:8.3f} ms/step  {eager_tok_s:8.1f} tok/s "
           f"(graph saves {eager_ms_per_step - ms_per_step:.3f} ms/step)")
@@ -138,16 +142,18 @@ def main():
         effective_gbs = step_bytes / (ms_per_step * 1e-3) / 1e9
         pct_spec = effective_gbs / SPEC_GBS
         pct_measured = effective_gbs / copy_gbs
+        pct_read = effective_gbs / read_gbs
         print(f"  bytes per step      {step_bytes / 1e9:8.4f} GB "
               f"(weights {weight_bytes / 1e9:.4f}, kv mean {(step_bytes - weight_bytes) / 1e6:.2f} MB)")
         print(f"  effective bandwidth {effective_gbs:8.1f} GB/s")
         print(f"  roofline            {pct_spec:8.1%} of {SPEC_GBS:.0f} GB/s spec, "
-              f"{pct_measured:.1%} of measured copy bandwidth")
+              f"{pct_read:.1%} of measured read bandwidth, {pct_measured:.1%} of copy")
         rows += [
             ("bytes_per_step", f"{step_bytes:.0f}", "B", "weights + mean kv cache read"),
             ("effective_bandwidth", f"{effective_gbs:.1f}", "GB/s", "bytes_per_step / ms_per_step"),
             ("roofline_pct_spec", f"{pct_spec * 100:.1f}", "%", f"of {SPEC_GBS:.0f} GB/s"),
             ("roofline_pct_measured", f"{pct_measured * 100:.1f}", "%", "of copy_bandwidth"),
+            ("roofline_pct_read", f"{pct_read * 100:.1f}", "%", "of read_bandwidth"),
         ]
     else:
         print("  roofline            skipped: the engine does not print weight_bytes_per_step and "
