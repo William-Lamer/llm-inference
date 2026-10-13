@@ -1,6 +1,7 @@
 import argparse
 import csv
 import datetime
+import json
 import statistics
 import subprocess
 import sys
@@ -82,6 +83,8 @@ def main():
     parser.add_argument("--steps", type=int, default=256)
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--skip-hf", action="store_true")
+    parser.add_argument("--llamacpp", help="llama.cpp checkout with build/bin/llama-bench and "
+                        "models/<model>-BF16.gguf")
     parser.add_argument("--record", action="store_true", help=f"append the numbers to {RESULTS}")
     args = parser.parse_args()
 
@@ -166,6 +169,29 @@ def main():
             ("hf_decode_tok_s", f"{hf_tok_s:.1f}", "tok/s",
              f"transformers eager bf16, {attn} attention, KV cache, median of {args.runs} runs"),
             ("speedup_vs_hf", f"{speedup:.2f}", "x", "decode_tok_s / hf_decode_tok_s"),
+        ]
+
+    if args.llamacpp:
+        llama_dir = Path(args.llamacpp)
+        gguf = llama_dir / "models" / f"{model}-BF16.gguf"
+        if not gguf.exists():
+            sys.exit(f"{gguf} not found: convert with llama.cpp's convert_hf_to_gguf.py --outtype bf16")
+        llama_cmd = [str(llama_dir / "build/bin/llama-bench"), "-m", str(gguf), "-ngl", "99",
+                     "-p", "0", "-n", str(args.steps), "-d", str(n_prompt),
+                     "-r", str(args.runs), "-o", "json"]
+        llama = json.loads(run(llama_cmd))[0]
+        llama_tok_s = statistics.median(llama["samples_ts"])
+        llama_speedup = tok_s / llama_tok_s
+        llama_build = llama["build_commit"]
+        print(f"  llama.cpp           {1e3 / llama_tok_s:8.3f} ms/step  {llama_tok_s:8.1f} tok/s "
+              f"(build {llama_build}, BF16 GGUF)")
+        print(f"  speedup over llama.cpp {llama_speedup:5.2f}x")
+        rows += [
+            ("llamacpp_decode_tok_s", f"{llama_tok_s:.1f}", "tok/s",
+             f"llama.cpp {llama_build} llama-bench, CUDA, BF16 GGUF, default flags, "
+             f"tg{args.steps} at depth {n_prompt}, median of {args.runs} runs"),
+            ("speedup_vs_llamacpp", f"{llama_speedup:.2f}", "x",
+             "decode_tok_s / llamacpp_decode_tok_s"),
         ]
 
     if args.record:

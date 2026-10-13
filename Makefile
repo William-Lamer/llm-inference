@@ -7,6 +7,9 @@ MODEL = models/Qwen3-0.6B
 REF = dumps/$(notdir $(MODEL))
 OUT = $(BUILD)/dumps/$(notdir $(MODEL))
 GREEDY = $(BUILD)/greedy/$(notdir $(MODEL))
+LLAMACPP = $(HOME)/projects/llama.cpp
+
+BENCH_FLAGS = $(if $(wildcard $(LLAMACPP)/build/bin/llama-bench),--llamacpp $(LLAMACPP))
 
 SRCS = $(wildcard src/*.cu)
 OBJS = $(patsubst src/%.cu,$(BUILD)/%.o,$(SRCS)) $(BUILD)/cJSON.o
@@ -61,11 +64,11 @@ calibrate:
 	uv run ref/compare.py -v $(REF) $(BUILD)/calib/$(notdir $(MODEL))
 
 bench: $(BUILD)/engine $(BUILD)/bandwidth
-	uv run bench/bench.py --model $(MODEL)
+	uv run bench/bench.py --model $(MODEL) $(BENCH_FLAGS)
 
 # Same as bench and profile, then appends the numbers to bench/results.csv
 record: $(BUILD)/engine $(BUILD)/bandwidth
-	uv run bench/bench.py --model $(MODEL) --record
+	uv run bench/bench.py --model $(MODEL) $(BENCH_FLAGS) --record
 	uv run bench/breakdown.py --model $(MODEL) --record
 
 # Same as record, with the displays off and the GPU checked idle first
